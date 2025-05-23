@@ -14,7 +14,7 @@ import ReviewSummary from './ReviewSummary';
 import { useAuth } from '@/contexts/AuthContext';
 import { getReviewsFromFirestore, checkIfUserReviewed, type ReviewWithId as FirestoreReview } from '@/lib/firestoreService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MapPin } from 'lucide-react'; // MapPin might still be used in Dialog
+import { Loader2, MapPin } from 'lucide-react'; 
 import { Separator } from './ui/separator';
 import { useToast } from '@/hooks/use-toast';
 
@@ -127,11 +127,11 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
           <DialogDescription className="text-base">
             {restaurant.cuisine}
-            <div className="flex items-center text-sm text-muted-foreground mt-1">
-              <MapPin size={14} className="mr-1.5 shrink-0" />
-              <span>{restaurant.address}</span>
-            </div>
           </DialogDescription>
+          <div className="flex items-center text-sm text-muted-foreground mt-1">
+            <MapPin size={14} className="mr-1.5 shrink-0" />
+            <span>{restaurant.address}</span>
+          </div>
           <div className="flex items-center pt-2">
             <StarRating rating={averageRating} readOnly />
             <span className="ml-2 text-sm text-muted-foreground">
