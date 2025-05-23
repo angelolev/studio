@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from './ThemeToggle'; // Added import
 
 export default function Header() {
   const { user, loadingAuthState, signInWithGoogle, signOut } = useAuth();
@@ -25,7 +26,8 @@ export default function Header() {
           <Utensils className="h-7 w-7" />
           <span>LocalEats</span>
         </Link>
-        <div>
+        <div className="flex items-center gap-2"> {/* Added gap-2 for spacing */}
+          <ThemeToggle /> {/* Added ThemeToggle component */}
           {loadingAuthState ? (
             <Button variant="outline" disabled>Loading...</Button>
           ) : user ? (
