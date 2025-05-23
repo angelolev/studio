@@ -9,14 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import StarRating from './StarRating';
-import type { Review as AppReviewType } from '@/types'; // AppReviewType.timestamp is now number
+import type { Review as AppReviewType } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { addReviewToFirestore, type ReviewFirestoreData, type ReviewWithId as FirestoreReviewWithId } from '@/lib/firestoreService';
+import { addReviewToFirestore, type ReviewFirestoreData, type AddedReviewPlain } from '@/lib/firestoreService';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import type { Timestamp as FirestoreTimestampType } from 'firebase/firestore';
-
+// Removed unused FirestoreTimestampType as addReviewToFirestore now returns plain object
 
 const reviewSchema = z.object({
   rating: z.number().min(1, 'Rating is required').max(5),
@@ -45,18 +44,25 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
 
   const addReviewMutation = useMutation({
     mutationFn: (reviewData: Omit<ReviewFirestoreData, 'timestamp' | 'restaurantId'>) => addReviewToFirestore(restaurantId, reviewData),
-    onSuccess: (newFirestoreReview: FirestoreReviewWithId) => { // newFirestoreReview.timestamp is Firestore Timestamp
+    onSuccess: (newPlainReview: AddedReviewPlain) => { // Expect AddedReviewPlain which has numeric timestamp
       toast({
         title: 'Review Submitted!',
         description: 'Thank you for your feedback.',
       });
       
-      // Convert Firestore Timestamp to number (milliseconds) for AppReviewType
-      const timestampInMillis = (newFirestoreReview.timestamp as FirestoreTimestampType).toMillis();
+      // AddedReviewPlain is already compatible with AppReviewType regarding the timestamp
+      // and other core fields.
       const newAppReview: AppReviewType = {
-        ...newFirestoreReview,
-        timestamp: timestampInMillis, 
+        id: newPlainReview.id,
+        userId: newPlainReview.userId,
+        userName: newPlainReview.userName,
+        userPhotoUrl: newPlainReview.userPhotoUrl,
+        restaurantId: newPlainReview.restaurantId,
+        rating: newPlainReview.rating,
+        text: newPlainReview.text,
+        timestamp: newPlainReview.timestamp, // Already a number
       };
+
       onReviewAdded(newAppReview);
       form.reset();
       form.setValue('rating', 0);

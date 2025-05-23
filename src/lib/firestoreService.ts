@@ -2,7 +2,7 @@
 'use server'; // Can be used by server components/actions, but functions are client-callable via hooks
 
 import { db } from '@/lib/firebase';
-import type { Review, Restaurant } from '@/types';
+import type { Review as AppReviewType } from '@/types'; // For reference
 import {
   collection,
   addDoc,
@@ -33,34 +33,55 @@ export interface ReviewWithId extends ReviewFirestoreData {
   timestamp: Timestamp; // Ensure timestamp is always Timestamp for reads
 }
 
+// New type for the plain object returned by addReviewToFirestore
+export interface AddedReviewPlain {
+  id: string;
+  userId: string;
+  userName: string | null;
+  userPhotoUrl?: string | null;
+  rating: number;
+  text: string;
+  restaurantId: string;
+  timestamp: number; // Milliseconds since Unix epoch
+}
+
 
 // Function to add a review to Firestore
 export async function addReviewToFirestore(
   restaurantId: string,
   reviewData: Omit<ReviewFirestoreData, 'timestamp' | 'restaurantId'>
-): Promise<ReviewWithId> {
+): Promise<AddedReviewPlain> { // Return type changed to AddedReviewPlain
   if (!reviewData.userId) {
     throw new Error('User ID is required to add a review.');
   }
   const reviewsColRef = collection(db, 'restaurants', restaurantId, 'reviews');
-  const docRef = await addDoc(reviewsColRef, {
+  
+  const docData = {
     ...reviewData,
-    restaurantId, // Add restaurantId to the document
-    timestamp: serverTimestamp(), // Use server timestamp
-  });
-
-  // For returning, we'll assume the serverTimestamp resolves to a valid Timestamp for now
-  // In a real scenario, you might re-fetch or construct carefully.
-  return { 
-    ...reviewData, 
-    id: docRef.id, 
     restaurantId,
-    timestamp: Timestamp.now() // Placeholder, actual value is server-generated
-  } as ReviewWithId;
+    timestamp: serverTimestamp(), // Firestore will set this server-side
+  };
+
+  const docRef = await addDoc(reviewsColRef, docData);
+
+  // For the return value to be plain, we need a numeric timestamp.
+  // Using client's current time as an approximation for the server timestamp for immediate UI update.
+  // The actual server timestamp will be available on subsequent fetches.
+  const clientTimestampMillis = Date.now();
+
+  return {
+    id: docRef.id,
+    userId: reviewData.userId,
+    userName: reviewData.userName,
+    userPhotoUrl: reviewData.userPhotoUrl,
+    rating: reviewData.rating,
+    text: reviewData.text,
+    restaurantId,
+    timestamp: clientTimestampMillis, // Numeric timestamp
+  };
 }
 
 // Function to get reviews for a restaurant
-// This is not a hook, it's a direct fetch function. Hooks would be in components.
 export async function getReviewsFromFirestore(restaurantId: string): Promise<ReviewWithId[]> {
   const reviewsColRef = collection(db, 'restaurants', restaurantId, 'reviews');
   const q = query(reviewsColRef, orderBy('timestamp', 'desc'));
