@@ -1,63 +1,70 @@
+"use client";
 
-'use client';
-
-import { useState, useEffect, useMemo } from 'react';
-import Image from 'next/image';
-import type { Restaurant } from '@/types';
-import type { Review as AppReviewType } from '@/types'; // This will now have timestamp as number
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import StarRating from './StarRating';
-import ReviewForm from './ReviewForm';
-import ReviewList from './ReviewList';
-import ReviewSummary from './ReviewSummary';
-import { useAuth } from '@/contexts/AuthContext';
-import { getReviewsFromFirestore, checkIfUserReviewed, type ReviewWithId as FirestoreReview } from '@/lib/firestoreService';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MapPin } from 'lucide-react';
-import { Separator } from './ui/separator';
-import { useToast } from '@/hooks/use-toast';
-import type { Timestamp as FirestoreTimestampType } from 'firebase/firestore';
+import { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
+import type { Restaurant } from "@/types";
+import type { Review as AppReviewType } from "@/types"; // This will now have timestamp as number
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import StarRating from "./StarRating";
+import ReviewForm from "./ReviewForm";
+import ReviewList from "./ReviewList";
+import ReviewSummary from "./ReviewSummary";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  getReviewsFromFirestore,
+  checkIfUserReviewed,
+  type ReviewWithNumericTimestamp,
+} from "@/lib/firestoreService";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, MapPin } from "lucide-react";
+import { Separator } from "./ui/separator";
+import { useToast } from "@/hooks/use-toast";
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
 }
 
-const mapFirestoreReviewToAppReview = (firestoreReview: FirestoreReview): AppReviewType => {
-  // Ensure timestamp is a number (milliseconds since epoch)
-  const timestampInMillis = (firestoreReview.timestamp as FirestoreTimestampType).toMillis();
-  return {
-    ...firestoreReview,
-    timestamp: timestampInMillis,
-  };
-};
-
 export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const { user, loadingAuthState } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const restaurantReviewsQueryKey = ['reviews', restaurant.id];
-  const userReviewedQueryKey = ['userReviewed', restaurant.id, user?.uid];
+  const restaurantReviewsQueryKey = ["reviews", restaurant.id];
+  const userReviewedQueryKey = ["userReviewed", restaurant.id, user?.uid];
 
-  const { data: reviews = [], isLoading: isLoadingReviews, error: reviewsError } = useQuery<FirestoreReview[], Error, AppReviewType[]>({
+  const {
+    data: reviews = [],
+    isLoading: isLoadingReviews,
+    error: reviewsError,
+  } = useQuery<ReviewWithNumericTimestamp[], Error, AppReviewType[]>({
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     enabled: isDialogOpen,
-    select: (data) => data.map(mapFirestoreReviewToAppReview), // Conversion happens here
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: userHasAlreadyReviewed, isLoading: isLoadingUserReviewedCheck } = useQuery<boolean, Error>({
+  const {
+    data: userHasAlreadyReviewed,
+    isLoading: isLoadingUserReviewedCheck,
+  } = useQuery<boolean, Error>({
     queryKey: userReviewedQueryKey,
     queryFn: () => checkIfUserReviewed(restaurant.id, user!.uid),
     enabled: isDialogOpen && !!user && !loadingAuthState,
     staleTime: 5 * 60 * 1000,
   });
-  
+
   useEffect(() => {
     if (reviewsError) {
       toast({
@@ -70,7 +77,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
   const averageRating = useMemo(() => {
     if (reviews.length > 0) {
-      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+      const totalRating = reviews.reduce(
+        (sum, review) => sum + review.rating,
+        0
+      );
       return totalRating / reviews.length;
     }
     return 0;
@@ -87,7 +97,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     if (loadingAuthState || isLoadingUserReviewedCheck) return false;
     if (!user) return false;
     return !userHasAlreadyReviewed;
-  }, [user, loadingAuthState, userHasAlreadyReviewed, isLoadingUserReviewedCheck]);
+  }, [
+    user,
+    loadingAuthState,
+    userHasAlreadyReviewed,
+    isLoadingUserReviewedCheck,
+  ]);
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -104,23 +119,29 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         </div>
 
         <div className="ml-3 sm:ml-4 flex-grow min-w-0 pr-2">
-          <h3 className="text-base sm:text-lg font-semibold truncate" title={restaurant.name}>
+          <h3
+            className="text-base sm:text-lg font-semibold truncate"
+            title={restaurant.name}
+          >
             {restaurant.name}
           </h3>
-          <p className="text-xs sm:text-sm text-muted-foreground truncate" title={restaurant.cuisine}>
+          <p
+            className="text-xs sm:text-sm text-muted-foreground truncate"
+            title={restaurant.cuisine}
+          >
             {restaurant.cuisine}
           </p>
         </div>
 
         <DialogTrigger asChild>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
             aria-label={`View reviews and details for ${restaurant.name}`}
           >
             <StarRating rating={averageRating} readOnly size={16} />
             <span className="text-xs text-muted-foreground mt-0.5">
-              ({reviewCount} opinion{reviewCount === 1 ? '' : 'es'})
+              ({reviewCount} opinion{reviewCount === 1 ? "" : "es"})
             </span>
           </Button>
         </DialogTrigger>
@@ -140,35 +161,46 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <div className="flex items-center pt-2">
             <StarRating rating={averageRating} readOnly />
             <span className="ml-2 text-sm text-muted-foreground">
-              Basado en {reviewCount} opinion{reviewCount === 1 ? '' : 'es'}
+              Basado en {reviewCount} opinion{reviewCount === 1 ? "" : "es"}
             </span>
           </div>
         </DialogHeader>
         <Separator className="my-4" />
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
           <p className="text-foreground">{restaurant.description}</p>
-          
-          <ReviewSummary restaurantName={restaurant.name} reviews={reviews.map(r => r.text)} />
+
+          <ReviewSummary
+            restaurantName={restaurant.name}
+            reviews={reviews.map((r) => r.text)}
+          />
 
           <div>
-            <h3 className="text-lg font-semibold mb-3 text-foreground">Reviews</h3>
+            <h3 className="text-lg font-semibold mb-3 text-foreground">
+              Reviews
+            </h3>
             {isLoadingReviews && (
               <div className="flex items-center justify-center p-4 my-4 min-h-[100px]">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <p className="ml-2 text-muted-foreground">Cargando opiniones...</p>
+                <p className="ml-2 text-muted-foreground">
+                  Cargando opiniones...
+                </p>
               </div>
             )}
             {!isLoadingReviews && reviewsError && (
               <p className="text-destructive">Error al cargar opiniones.</p>
             )}
-            {!isLoadingReviews && !reviewsError && <ReviewList reviews={reviews} />}
+            {!isLoadingReviews && !reviewsError && (
+              <ReviewList reviews={reviews} />
+            )}
           </div>
 
           {loadingAuthState && (
-              <div className="flex items-center justify-center p-4 my-4 min-h-[50px]">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <p className="ml-2 text-muted-foreground text-sm">Verificando estado de autenticación...</p>
-              </div>
+            <div className="flex items-center justify-center p-4 my-4 min-h-[50px]">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="ml-2 text-muted-foreground text-sm">
+                Verificando estado de autenticación...
+              </p>
+            </div>
           )}
 
           {!loadingAuthState && !user && (
@@ -176,28 +208,45 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               Inicia sesión para dejar tu opinión.
             </p>
           )}
-          
+
           {!loadingAuthState && user && isLoadingUserReviewedCheck && (
             <div className="flex items-center justify-center p-4 my-4 min-h-[50px]">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <p className="ml-2 text-muted-foreground text-sm">Comprobando si ya opinaste...</p>
-              </div>
-          )}
-
-          {!loadingAuthState && user && !isLoadingUserReviewedCheck && showReviewForm && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 text-foreground">Leave a Review</h3>
-              <ReviewForm restaurantId={restaurant.id} onReviewAdded={handleReviewAdded} />
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="ml-2 text-muted-foreground text-sm">
+                Comprobando si ya opinaste...
+              </p>
             </div>
           )}
-          {!loadingAuthState && user && !isLoadingUserReviewedCheck && !showReviewForm && userHasAlreadyReviewed && (
-            <p className="text-center text-sm p-4 bg-accent/10 text-accent-foreground rounded-md border border-accent/30">
-              Ya has dejado tu opinión en este restaurante. Gracias por tu ayuda!
-            </p>
-          )}
+
+          {!loadingAuthState &&
+            user &&
+            !isLoadingUserReviewedCheck &&
+            showReviewForm && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 text-foreground">
+                  Leave a Review
+                </h3>
+                <ReviewForm
+                  restaurantId={restaurant.id}
+                  onReviewAdded={handleReviewAdded}
+                />
+              </div>
+            )}
+          {!loadingAuthState &&
+            user &&
+            !isLoadingUserReviewedCheck &&
+            !showReviewForm &&
+            userHasAlreadyReviewed && (
+              <p className="text-center text-sm p-4 bg-accent/10 text-accent-foreground rounded-md border border-accent/30">
+                Ya has dejado tu opinión en este restaurante. Gracias por tu
+                ayuda!
+              </p>
+            )}
         </div>
-          <DialogFooter className="mt-auto pt-4 border-t">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cerrar</Button>
+        <DialogFooter className="mt-auto pt-4 border-t">
+          <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            Cerrar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

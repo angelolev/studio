@@ -1,8 +1,7 @@
+"use server"; // Can be used by server components/actions, but functions are client-callable via hooks
 
-'use server'; // Can be used by server components/actions, but functions are client-callable via hooks
-
-import { db } from '@/lib/firebase';
-import type { Review as AppReviewType } from '@/types'; // For reference
+import { db } from "@/lib/firebase";
+import type { Review as AppReviewType } from "@/types"; // For reference
 import {
   collection,
   addDoc,
@@ -14,8 +13,8 @@ import {
   getDocs,
   doc,
   serverTimestamp,
-} from 'firebase/firestore';
-import type { User as FirebaseUser } from 'firebase/auth';
+} from "firebase/firestore";
+import type { User as FirebaseUser } from "firebase/auth";
 
 // Type for review data to be stored in Firestore
 export interface ReviewFirestoreData {
@@ -33,6 +32,13 @@ export interface ReviewWithId extends ReviewFirestoreData {
   timestamp: Timestamp; // Ensure timestamp is always Timestamp for reads
 }
 
+// Type for reviews returned by getReviewsFromFirestore (with numeric timestamp for serialization)
+export interface ReviewWithNumericTimestamp
+  extends Omit<ReviewFirestoreData, "timestamp"> {
+  id: string;
+  timestamp: number; // Numeric timestamp (milliseconds since epoch)
+}
+
 // New type for the plain object returned by addReviewToFirestore
 export interface AddedReviewPlain {
   id: string;
@@ -45,17 +51,17 @@ export interface AddedReviewPlain {
   timestamp: number; // Milliseconds since Unix epoch
 }
 
-
 // Function to add a review to Firestore
 export async function addReviewToFirestore(
   restaurantId: string,
-  reviewData: Omit<ReviewFirestoreData, 'timestamp' | 'restaurantId'>
-): Promise<AddedReviewPlain> { // Return type changed to AddedReviewPlain
+  reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId">
+): Promise<AddedReviewPlain> {
+  // Return type changed to AddedReviewPlain
   if (!reviewData.userId) {
-    throw new Error('User ID is required to add a review.');
+    throw new Error("User ID is required to add a review.");
   }
-  const reviewsColRef = collection(db, 'restaurants', restaurantId, 'reviews');
-  
+  const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
+
   const docData = {
     ...reviewData,
     restaurantId,
@@ -82,18 +88,32 @@ export async function addReviewToFirestore(
 }
 
 // Function to get reviews for a restaurant
-export async function getReviewsFromFirestore(restaurantId: string): Promise<ReviewWithId[]> {
-  const reviewsColRef = collection(db, 'restaurants', restaurantId, 'reviews');
-  const q = query(reviewsColRef, orderBy('timestamp', 'desc'));
+export async function getReviewsFromFirestore(
+  restaurantId: string
+): Promise<ReviewWithNumericTimestamp[]> {
+  const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
+  const q = query(reviewsColRef, orderBy("timestamp", "desc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReviewWithId));
+  return querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    // Convert Firestore Timestamp to milliseconds for serialization
+    const timestamp = data.timestamp as Timestamp;
+    return {
+      id: doc.id,
+      ...data,
+      timestamp: timestamp.toMillis(), // Convert to number
+    } as ReviewWithNumericTimestamp;
+  });
 }
 
 // Function to check if a user has reviewed a restaurant
-export async function checkIfUserReviewed(restaurantId: string, userId: string): Promise<boolean> {
+export async function checkIfUserReviewed(
+  restaurantId: string,
+  userId: string
+): Promise<boolean> {
   if (!userId) return false;
-  const reviewsColRef = collection(db, 'restaurants', restaurantId, 'reviews');
-  const q = query(reviewsColRef, where('userId', '==', userId));
+  const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
+  const q = query(reviewsColRef, where("userId", "==", userId));
   const snapshot = await getCountFromServer(q);
   return snapshot.data().count > 0;
 }
