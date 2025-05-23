@@ -57,7 +57,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     select: (data) =>
       data.map((review) => ({
         ...review,
-        timestamp: review.timestamp, // Already a number from getReviewsFromFirestore
+        timestamp: review.timestamp, 
       })),
   });
 
@@ -116,8 +116,8 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         <Card
           className="flex items-center p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg w-full cursor-pointer"
           aria-label={`View details and reviews for ${restaurant.name}`}
-          role="button" // Semantically it's a button opening a dialog
-          tabIndex={0} // Make it focusable
+          role="button"
+          tabIndex={0} 
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               setIsDialogOpen(true);
@@ -152,7 +152,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
           <div
             className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto"
-            aria-hidden="true" // The card itself is the interactive element for screen readers
+            aria-label={`View reviews and details for ${restaurant.name}`}
           >
             <StarRating rating={averageRating} readOnly size={16} />
             <span className="text-xs text-muted-foreground mt-0.5">
@@ -181,8 +181,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         </DialogHeader>
         <Separator className="my-4" />
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
-          <p className="text-foreground">{restaurant.description}</p>
-
+          
           <ReviewSummary
             restaurantName={restaurant.name}
             reviews={reviews.map((r) => r.text)}
@@ -266,4 +265,3 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
-

@@ -11,11 +11,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import StarRating from './StarRating';
 import type { Review as AppReviewType } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { addReviewToFirestore, type ReviewFirestoreData, type AddedReviewPlain } from '@/lib/firestoreService';
+import { addReviewToFirestore, type AddedReviewPlain } from '@/lib/firestoreService';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-// Removed unused FirestoreTimestampType as addReviewToFirestore now returns plain object
 
 const reviewSchema = z.object({
   rating: z.number().min(1, 'Rating is required').max(5),
@@ -44,14 +43,12 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
 
   const addReviewMutation = useMutation({
     mutationFn: (reviewData: Omit<ReviewFirestoreData, 'timestamp' | 'restaurantId'>) => addReviewToFirestore(restaurantId, reviewData),
-    onSuccess: (newPlainReview: AddedReviewPlain) => { // Expect AddedReviewPlain which has numeric timestamp
+    onSuccess: (newPlainReview: AddedReviewPlain) => { 
       toast({
         title: 'Review Submitted!',
         description: 'Thank you for your feedback.',
       });
       
-      // AddedReviewPlain is already compatible with AppReviewType regarding the timestamp
-      // and other core fields.
       const newAppReview: AppReviewType = {
         id: newPlainReview.id,
         userId: newPlainReview.userId,
@@ -60,7 +57,7 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
         restaurantId: newPlainReview.restaurantId,
         rating: newPlainReview.rating,
         text: newPlainReview.text,
-        timestamp: newPlainReview.timestamp, // Already a number
+        timestamp: newPlainReview.timestamp, 
       };
 
       onReviewAdded(newAppReview);
@@ -140,7 +137,7 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
             <FormItem>
               <FormLabel>Your Review</FormLabel>
               <FormControl>
-                <Textarea placeholder="Tell us about your experience..." {...field} rows={4} />
+                <Textarea placeholder="Tell us about your experience..." {...field} rows={4} className="bg-card" />
               </FormControl>
               <FormMessage />
             </FormItem>
