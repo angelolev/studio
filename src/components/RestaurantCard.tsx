@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import type { Restaurant } from "@/types";
-import type { Review as AppReviewType } from "@/types"; // This will now have timestamp as number
+import type { Review as AppReviewType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -53,6 +54,11 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     enabled: isDialogOpen,
     staleTime: 5 * 60 * 1000,
+    select: (data) =>
+      data.map((review) => ({
+        ...review,
+        timestamp: review.timestamp, // Already a number from getReviewsFromFirestore
+      })),
   });
 
   const {
@@ -106,46 +112,55 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <Card className="flex items-center p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg w-full">
-        <div className="flex-shrink-0">
-          <Image
-            src={restaurant.imageUrl}
-            alt={`${restaurant.name} logo`}
-            width={64}
-            height={64}
-            className="rounded-md object-cover aspect-square"
-            data-ai-hint="restaurant logo"
-          />
-        </div>
+      <DialogTrigger asChild>
+        <Card
+          className="flex items-center p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg w-full cursor-pointer"
+          aria-label={`View details and reviews for ${restaurant.name}`}
+          role="button" // Semantically it's a button opening a dialog
+          tabIndex={0} // Make it focusable
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setIsDialogOpen(true);
+            }
+          }}
+        >
+          <div className="flex-shrink-0">
+            <Image
+              src={restaurant.imageUrl}
+              alt={`${restaurant.name} logo`}
+              width={64}
+              height={64}
+              className="rounded-md object-cover aspect-square"
+              data-ai-hint="restaurant logo"
+            />
+          </div>
 
-        <div className="ml-3 sm:ml-4 flex-grow min-w-0 pr-2">
-          <h3
-            className="text-base sm:text-lg font-semibold truncate"
-            title={restaurant.name}
-          >
-            {restaurant.name}
-          </h3>
-          <p
-            className="text-xs sm:text-sm text-muted-foreground truncate"
-            title={restaurant.cuisine}
-          >
-            {restaurant.cuisine}
-          </p>
-        </div>
+          <div className="ml-3 sm:ml-4 flex-grow min-w-0 pr-2">
+            <h3
+              className="text-base sm:text-lg font-semibold truncate"
+              title={restaurant.name}
+            >
+              {restaurant.name}
+            </h3>
+            <p
+              className="text-xs sm:text-sm text-muted-foreground truncate"
+              title={restaurant.cuisine}
+            >
+              {restaurant.cuisine}
+            </p>
+          </div>
 
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
-            aria-label={`View reviews and details for ${restaurant.name}`}
+          <div
+            className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto"
+            aria-hidden="true" // The card itself is the interactive element for screen readers
           >
             <StarRating rating={averageRating} readOnly size={16} />
             <span className="text-xs text-muted-foreground mt-0.5">
               ({reviewCount} opinion{reviewCount === 1 ? "" : "es"})
             </span>
-          </Button>
-        </DialogTrigger>
-      </Card>
+          </div>
+        </Card>
+      </DialogTrigger>
 
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
@@ -153,7 +168,6 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <DialogDescription className="text-base">
             {restaurant.cuisine}
           </DialogDescription>
-          {/* Moved address div to be a sibling of DialogDescription */}
           <div className="flex items-center text-sm text-muted-foreground mt-1">
             <MapPin size={14} className="mr-1.5 shrink-0" />
             <span>{restaurant.address}</span>
@@ -252,3 +266,4 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
+
