@@ -1,13 +1,16 @@
+
 'use client';
 
-import type { Review } from '@/types';
+// This file can be used for other non-authentication related localStorage needs.
+// Review-specific localStorage functions have been removed as reviews are now handled by Firebase Firestore.
+
 import { v4 as uuidv4 } from 'uuid';
 
-const ANONYMOUS_USER_ID_KEY = 'localEatsUserId';
-const REVIEWS_KEY_PREFIX = 'localEatsReviews_';
+const ANONYMOUS_USER_ID_KEY = 'localEatsAnonymousUserId'; // Renamed for clarity
 
-export const getOrSetUserId = (): string => {
-  if (typeof window === 'undefined') return 'server-user'; // Should not happen in practice for this function
+// Gets or sets an anonymous ID for users not logged in, if needed for other features.
+export const getOrSetAnonymousId = (): string => {
+  if (typeof window === 'undefined') return 'server-anonymous-user';
   let userId = localStorage.getItem(ANONYMOUS_USER_ID_KEY);
   if (!userId) {
     userId = uuidv4();
@@ -16,27 +19,13 @@ export const getOrSetUserId = (): string => {
   return userId;
 };
 
-const getRestaurantReviewsKey = (restaurantId: string) => `${REVIEWS_KEY_PREFIX}${restaurantId}`;
+// Example of a non-review related function you might keep or add:
+// export const getThemePreference = (): string | null => {
+//   if (typeof window === 'undefined') return null;
+//   return localStorage.getItem('themePreference');
+// };
 
-export const getReviews = (restaurantId: string): Review[] => {
-  if (typeof window === 'undefined') return [];
-  const reviewsJson = localStorage.getItem(getRestaurantReviewsKey(restaurantId));
-  return reviewsJson ? JSON.parse(reviewsJson) : [];
-};
-
-export const addReview = (review: Review): { success: boolean; message?: string } => {
-  if (typeof window === 'undefined') return { success: false, message: 'Cannot add review from server.' };
-  const reviews = getReviews(review.restaurantId);
-  if (reviews.some(r => r.userId === review.userId)) {
-    return { success: false, message: 'You have already reviewed this restaurant.' };
-  }
-  reviews.push(review);
-  localStorage.setItem(getRestaurantReviewsKey(review.restaurantId), JSON.stringify(reviews));
-  return { success: true };
-};
-
-export const hasUserReviewed = (restaurantId: string, userId: string): boolean => {
-  if (typeof window === 'undefined') return false;
-  const reviews = getReviews(restaurantId);
-  return reviews.some(r => r.userId === userId);
-};
+// export const setThemePreference = (theme: string): void => {
+//   if (typeof window === 'undefined') return;
+//   localStorage.setItem('themePreference', theme);
+// };

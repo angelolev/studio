@@ -3,18 +3,18 @@ import type { Restaurant } from '@/types';
 export const restaurants: Restaurant[] = [
   {
     id: '1',
-    name: 'The Gourmet Place',
-    imageUrl: 'https://placehold.co/600x400.png',
+    name: 'El pollo Pechugon',
+    imageUrl: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/12/40/f2/e1/pollo-pechugon.jpg?w=500&h=-1&s=1',
     description: 'Experience the finest dining with our exquisite seasonal menu and an extensive wine list.',
-    cuisine: 'Modern European',
-    address: '123 Foodie Lane, Gourmet City',
+    cuisine: 'Pollo a la brasa',
+    address: 'Avenida Bolognesi 372',
   },
   {
     id: '2',
-    name: 'Pasta Paradise',
+    name: 'La Pasta',
     imageUrl: 'https://placehold.co/600x400.png',
     description: 'Authentic Italian pasta dishes made with love and the freshest ingredients. Buon Appetito!',
-    cuisine: 'Italian',
+    cuisine: 'Italiano',
     address: '456 Pasta Ave, Little Italy',
   },
   {
