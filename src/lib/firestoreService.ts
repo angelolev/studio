@@ -1,7 +1,8 @@
-"use server"; // Can be used by server components/actions, but functions are client-callable via hooks
+
+"use server"; 
 
 import { db } from "@/lib/firebase";
-import type { Review as AppReviewType } from "@/types"; // For reference
+import type { Review as AppReviewType, Restaurant as AppRestaurantType } from "@/types";
 import {
   collection,
   addDoc,
@@ -11,35 +12,33 @@ import {
   where,
   getCountFromServer,
   getDocs,
-  doc,
   serverTimestamp,
+  doc, // Import doc
+  setDoc, // Import setDoc for adding restaurant with specific ID (if needed, but addDoc is fine for auto-ID)
 } from "firebase/firestore";
-import type { User as FirebaseUser } from "firebase/auth";
 
-// Type for review data to be stored in Firestore
+// --- Review Types and Functions ---
 export interface ReviewFirestoreData {
   userId: string;
   userName: string | null;
   userPhotoUrl?: string | null;
   rating: number;
   text: string;
-  timestamp: Timestamp | ReturnType<typeof serverTimestamp>; // Allow FieldValue for writes
+  timestamp: Timestamp | ReturnType<typeof serverTimestamp>;
   restaurantId: string;
 }
 
 export interface ReviewWithId extends ReviewFirestoreData {
   id: string;
-  timestamp: Timestamp; // Ensure timestamp is always Timestamp for reads
+  timestamp: Timestamp;
 }
 
-// Type for reviews returned by getReviewsFromFirestore (with numeric timestamp for serialization)
 export interface ReviewWithNumericTimestamp
   extends Omit<ReviewFirestoreData, "timestamp"> {
   id: string;
-  timestamp: number; // Numeric timestamp (milliseconds since epoch)
+  timestamp: number;
 }
 
-// New type for the plain object returned by addReviewToFirestore
 export interface AddedReviewPlain {
   id: string;
   userId: string;
@@ -48,33 +47,24 @@ export interface AddedReviewPlain {
   rating: number;
   text: string;
   restaurantId: string;
-  timestamp: number; // Milliseconds since Unix epoch
+  timestamp: number;
 }
 
-// Function to add a review to Firestore
 export async function addReviewToFirestore(
   restaurantId: string,
   reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId">
 ): Promise<AddedReviewPlain> {
-  // Return type changed to AddedReviewPlain
   if (!reviewData.userId) {
     throw new Error("User ID is required to add a review.");
   }
   const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
-
   const docData = {
     ...reviewData,
     restaurantId,
-    timestamp: serverTimestamp(), // Firestore will set this server-side
+    timestamp: serverTimestamp(),
   };
-
   const docRef = await addDoc(reviewsColRef, docData);
-
-  // For the return value to be plain, we need a numeric timestamp.
-  // Using client's current time as an approximation for the server timestamp for immediate UI update.
-  // The actual server timestamp will be available on subsequent fetches.
   const clientTimestampMillis = Date.now();
-
   return {
     id: docRef.id,
     userId: reviewData.userId,
@@ -83,11 +73,10 @@ export async function addReviewToFirestore(
     rating: reviewData.rating,
     text: reviewData.text,
     restaurantId,
-    timestamp: clientTimestampMillis, // Numeric timestamp
+    timestamp: clientTimestampMillis,
   };
 }
 
-// Function to get reviews for a restaurant
 export async function getReviewsFromFirestore(
   restaurantId: string
 ): Promise<ReviewWithNumericTimestamp[]> {
@@ -96,17 +85,15 @@ export async function getReviewsFromFirestore(
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
-    // Convert Firestore Timestamp to milliseconds for serialization
     const timestamp = data.timestamp as Timestamp;
     return {
       id: doc.id,
       ...data,
-      timestamp: timestamp.toMillis(), // Convert to number
+      timestamp: timestamp ? timestamp.toMillis() : Date.now(), // Fallback if timestamp is somehow null
     } as ReviewWithNumericTimestamp;
   });
 }
 
-// Function to check if a user has reviewed a restaurant
 export async function checkIfUserReviewed(
   restaurantId: string,
   userId: string
@@ -116,4 +103,75 @@ export async function checkIfUserReviewed(
   const q = query(reviewsColRef, where("userId", "==", userId));
   const snapshot = await getCountFromServer(q);
   return snapshot.data().count > 0;
+}
+
+// --- Restaurant Types and Functions ---
+
+// Type for restaurant data to be stored in Firestore
+export interface RestaurantFirestoreData {
+  name: string;
+  cuisine: string;
+  address: string;
+  imageUrl: string;
+  description: string;
+  createdAt: Timestamp | ReturnType<typeof serverTimestamp>;
+  // userId?: string; // Optional: if you want to track who added it
+}
+
+// Type for restaurant data returned from Firestore (with ID and converted timestamp)
+export interface RestaurantWithNumericTimestamp extends Omit<AppRestaurantType, 'id'> {
+  id: string;
+  createdAt?: number; // Numeric timestamp for serialization
+}
+
+
+// Function to add a new restaurant to Firestore
+export async function addRestaurantToFirestore(
+  restaurantData: Pick<AppRestaurantType, 'name' | 'cuisine' | 'address'>
+): Promise<AppRestaurantType> { // Returns the full AppRestaurantType including the new ID
+  
+  const restaurantColRef = collection(db, "restaurants");
+
+  const docData: RestaurantFirestoreData = {
+    ...restaurantData,
+    imageUrl: 'https://placehold.co/600x400.png', // Default placeholder
+    description: `A restaurant specializing in ${restaurantData.cuisine}, located at ${restaurantData.address}.`, // Generic description
+    createdAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(restaurantColRef, docData);
+
+  return {
+    id: docRef.id,
+    name: restaurantData.name,
+    cuisine: restaurantData.cuisine,
+    address: restaurantData.address,
+    imageUrl: docData.imageUrl,
+    description: docData.description,
+    // createdAt: Date.now(), // Approximate for immediate client use; actual value is server-generated
+  };
+}
+
+// Function to get all restaurants from Firestore
+export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]> {
+  const restaurantColRef = collection(db, "restaurants");
+  // Optionally, order by a field, e.g., createdAt or name
+  // const q = query(restaurantColRef, orderBy("createdAt", "desc"));
+  const q = query(restaurantColRef, orderBy("name", "asc")); // Example: order by name
+  
+  const querySnapshot = await getDocs(q);
+  
+  return querySnapshot.docs.map((doc) => {
+    const data = doc.data() as RestaurantFirestoreData;
+    // const createdAtTimestamp = data.createdAt as Timestamp;
+    return {
+      id: doc.id,
+      name: data.name,
+      cuisine: data.cuisine,
+      address: data.address,
+      imageUrl: data.imageUrl,
+      description: data.description,
+      // createdAt: createdAtTimestamp ? createdAtTimestamp.toMillis() : undefined,
+    } as AppRestaurantType; // Cast to ensure type compatibility
+  });
 }

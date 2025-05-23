@@ -2,8 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Added for navigation
-import { Utensils, LogIn, LogOut, UserCircle, PlusCircle } from 'lucide-react'; // Added PlusCircle
+import { Utensils, LogIn, LogOut, UserCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,31 +15,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from './ThemeToggle';
-import { useToast } from '@/hooks/use-toast'; // Added for toast
+// Removed useRouter, PlusCircle, useToast as "Add Restaurant" button is moved
 
 export default function Header() {
   const { user, loadingAuthState, signInWithGoogle, signOut } = useAuth();
-  const router = useRouter();
-  const { toast } = useToast();
-
-  const handleAddRestaurantClick = () => {
-    if (!user && !loadingAuthState) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please sign in to add a new restaurant.',
-        action: <Button onClick={async () => {
-          await signInWithGoogle();
-          // User will need to click "Add Restaurant" again after signing in.
-          // A more seamless UX would involve redirecting after login.
-        }}>Sign In</Button>,
-      });
-    } else if (user) {
-      router.push('/add-restaurant');
-    }
-  };
 
   return (
-    <header className="bg-card border-b border-border shadow-sm">
+    <header className="bg-card border-b border-border shadow-sm sticky top-0 z-40">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-primary hover:text-primary/90 transition-colors">
           <Utensils className="h-7 w-7" />
@@ -48,10 +29,7 @@ export default function Header() {
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-           <Button variant="outline" onClick={handleAddRestaurantClick} aria-label="Add new restaurant">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Restaurant
-          </Button>
+          {/* "Add Restaurant" button removed from here */}
           {loadingAuthState ? (
             <Button variant="outline" disabled>Loading...</Button>
           ) : user ? (

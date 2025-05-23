@@ -6,16 +6,16 @@ import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { v4 as uuidv4 } from 'uuid';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Restaurant } from '@/types';
+import { addRestaurantToFirestore } from '@/lib/firestoreService';
 import { Loader2 } from 'lucide-react';
 
 const addRestaurantSchema = z.object({
@@ -30,6 +30,7 @@ export default function AddRestaurantPage() {
   const { user, loadingAuthState } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
@@ -47,33 +48,33 @@ export default function AddRestaurantPage() {
         description: 'You must be logged in to add a restaurant.',
         variant: 'destructive',
       });
-      router.replace('/'); // Redirect to home if not logged in
+      router.replace('/'); 
     }
   }, [user, loadingAuthState, router, toast]);
 
+  const mutation = useMutation({
+    mutationFn: (newRestaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>) => addRestaurantToFirestore(newRestaurantData),
+    onSuccess: (data) => {
+      toast({
+        title: 'Restaurant Added!',
+        description: `${data.name} has been successfully added to the list.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+      form.reset();
+      router.push('/'); 
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error Adding Restaurant',
+        description: error.message || 'Could not add the restaurant. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const onSubmit: SubmitHandler<AddRestaurantFormData> = (data) => {
-    if (!user) return; // Should be caught by useEffect, but good practice
-
-    const newRestaurant: Restaurant = {
-      id: uuidv4(),
-      name: data.name,
-      cuisine: data.cuisine,
-      address: data.address,
-      imageUrl: 'https://placehold.co/600x400.png', // Placeholder image
-      description: `A newly added restaurant: ${data.name}, specializing in ${data.cuisine}. Located at ${data.address}.`, // Generic description
-    };
-
-    console.log('New Restaurant Data:', newRestaurant);
-    // TODO: Implement saving to Firestore and updating global/page state
-    // For now, just show a success toast and redirect
-
-    toast({
-      title: 'Restaurant Added (Locally)!',
-      description: `${newRestaurant.name} has been noted. It won't be saved permanently or visible to others in this version.`,
-    });
-
-    form.reset();
-    router.push('/'); // Redirect to home page after "submission"
+    if (!user) return;
+    mutation.mutate(data);
   };
 
   if (loadingAuthState) {
@@ -86,8 +87,6 @@ export default function AddRestaurantPage() {
   }
 
   if (!user) {
-     // This state should ideally not be reached due to the useEffect redirect,
-     // but it's a fallback.
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-lg text-destructive">Access Denied.</p>
@@ -148,8 +147,8 @@ export default function AddRestaurantPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? (
+              <Button type="submit" className="w-full" disabled={mutation.isPending}>
+                {mutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Adding...

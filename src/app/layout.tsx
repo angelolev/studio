@@ -5,6 +5,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/Header';
 import AppProviders from '@/components/AppProviders';
+import FloatingAddButton from '@/components/FloatingAddButton'; // Import the new button
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -34,6 +35,7 @@ export default function RootLayout({
         <AppProviders>
           <Header />
           <main className="container mx-auto px-4 py-8">{children}</main>
+          <FloatingAddButton /> {/* Add the button here */}
           <Toaster />
         </AppProviders>
       </body>
