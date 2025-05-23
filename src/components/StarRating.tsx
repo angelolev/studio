@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Star } from 'lucide-react';
@@ -46,32 +47,45 @@ export default function StarRating({
     }
   };
 
+  const StarIcon = ({ filled }: { filled: boolean }) => (
+    <Star
+      size={size}
+      className={cn(
+        'transition-colors',
+        filled ? 'text-accent fill-accent' : 'text-muted-foreground'
+      )}
+    />
+  );
+
   return (
-    <div className={cn('flex items-center gap-1', className)}>
+    <div className={cn('flex items-center gap-1', className)} role="img" aria-label={`Rating: ${currentRating} out of 5 stars`}>
       {[...Array(5)].map((_, index) => {
         const starValue = index + 1;
         const isFilled = starValue <= (hoverRating || currentRating);
+
+        if (readOnly) {
+          return (
+            <div key={index} className="p-0" aria-hidden="true"> {/* Screen readers will use the parent div's aria-label */}
+              <StarIcon filled={isFilled} />
+            </div>
+          );
+        }
+
         return (
           <button
             key={index}
             type="button"
-            disabled={readOnly}
+            disabled={readOnly} // Should always be false here due to the if block above, but kept for clarity
             onMouseOver={() => handleMouseOver(index)}
             onMouseLeave={handleMouseLeave}
             onClick={() => handleClick(index)}
             className={cn(
-              'p-0 bg-transparent border-none cursor-default',
+              'p-0 bg-transparent border-none',
               !readOnly && 'cursor-pointer'
             )}
             aria-label={`Rate ${starValue} out of 5 stars`}
           >
-            <Star
-              size={size}
-              className={cn(
-                'transition-colors',
-                isFilled ? 'text-accent fill-accent' : 'text-muted-foreground'
-              )}
-            />
+            <StarIcon filled={isFilled} />
           </button>
         );
       })}
