@@ -6,21 +6,22 @@ import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Restaurant } from '@/types';
-import { addRestaurantToFirestore } from '@/lib/firestoreService';
+import type { Restaurant, Cuisine } from '@/types';
+import { addRestaurantToFirestore, getCuisinesFromFirestore } from '@/lib/firestoreService';
 import { Loader2 } from 'lucide-react';
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, { message: 'Restaurant name must be at least 2 characters.' }),
-  cuisine: z.string().min(2, { message: 'Cuisine/Category must be at least 2 characters.' }),
+  cuisine: z.string().min(1, { message: 'Please select a cuisine/category.' }), // Changed from min(2)
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
 });
 
@@ -41,6 +42,12 @@ export default function AddRestaurantPage() {
     },
   });
 
+  const { data: cuisines, isLoading: isLoadingCuisines, error: cuisinesError } = useQuery<Cuisine[], Error>({
+    queryKey: ['cuisines'],
+    queryFn: getCuisinesFromFirestore,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   useEffect(() => {
     if (!loadingAuthState && !user) {
       toast({
@@ -51,6 +58,16 @@ export default function AddRestaurantPage() {
       router.replace('/'); 
     }
   }, [user, loadingAuthState, router, toast]);
+
+  useEffect(() => {
+    if (cuisinesError) {
+      toast({
+        title: 'Error Loading Cuisines',
+        description: 'Could not load cuisine options. Please try refreshing.',
+        variant: 'destructive',
+      });
+    }
+  }, [cuisinesError, toast]);
 
   const mutation = useMutation({
     mutationFn: (newRestaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>) => addRestaurantToFirestore(newRestaurantData),
@@ -127,9 +144,24 @@ export default function AddRestaurantPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cuisine / Category</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Italian, Cafe, Bakery" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingCuisines || !cuisines}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoadingCuisines ? "Loading cuisines..." : "Select a cuisine"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cuisines && cuisines.length > 0 ? (
+                          cuisines.map((cuisine) => (
+                            <SelectItem key={cuisine.id} value={cuisine.id}>
+                              {cuisine.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          !isLoadingCuisines && <SelectItem value="disabled" disabled>No cuisines available</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -147,7 +179,7 @@ export default function AddRestaurantPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={mutation.isPending}>
+              <Button type="submit" className="w-full" disabled={mutation.isPending || isLoadingCuisines}>
                 {mutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -164,3 +196,4 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
+
