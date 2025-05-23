@@ -2,7 +2,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Utensils, LogIn, LogOut, UserCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation'; // Added for navigation
+import { Utensils, LogIn, LogOut, UserCircle, PlusCircle } from 'lucide-react'; // Added PlusCircle
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -14,10 +15,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ThemeToggle } from './ThemeToggle'; // Added import
+import { ThemeToggle } from './ThemeToggle';
+import { useToast } from '@/hooks/use-toast'; // Added for toast
 
 export default function Header() {
   const { user, loadingAuthState, signInWithGoogle, signOut } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleAddRestaurantClick = () => {
+    if (!user && !loadingAuthState) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please sign in to add a new restaurant.',
+        action: <Button onClick={async () => {
+          await signInWithGoogle();
+          // User will need to click "Add Restaurant" again after signing in.
+          // A more seamless UX would involve redirecting after login.
+        }}>Sign In</Button>,
+      });
+    } else if (user) {
+      router.push('/add-restaurant');
+    }
+  };
 
   return (
     <header className="bg-card border-b border-border shadow-sm">
@@ -26,8 +46,12 @@ export default function Header() {
           <Utensils className="h-7 w-7" />
           <span>LocalEats</span>
         </Link>
-        <div className="flex items-center gap-2"> {/* Added gap-2 for spacing */}
-          <ThemeToggle /> {/* Added ThemeToggle component */}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+           <Button variant="outline" onClick={handleAddRestaurantClick} aria-label="Add new restaurant">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Restaurant
+          </Button>
           {loadingAuthState ? (
             <Button variant="outline" disabled>Loading...</Button>
           ) : user ? (
