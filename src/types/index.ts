@@ -1,5 +1,5 @@
 
-import type { Timestamp } from 'firebase/firestore';
+import type { Timestamp as FirestoreTimestamp } from 'firebase/firestore'; // Renamed to avoid conflict if needed locally
 
 export interface Review {
   id: string; // Firestore document ID
@@ -9,7 +9,7 @@ export interface Review {
   restaurantId: string;
   rating: number; // 1-5
   text: string;
-  timestamp: Timestamp | number; // Firestore Timestamp on read, number for client-side optimisitic updates before Firestore save
+  timestamp: number; // Milliseconds since Unix epoch for client-side usage
 }
 
 export interface Restaurant {
@@ -20,3 +20,4 @@ export interface Restaurant {
   cuisine: string;
   address: string;
 }
+

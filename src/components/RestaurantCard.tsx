@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import type { Restaurant, Review as AppReviewType } from '@/types';
+import type { Restaurant } from '@/types';
+import type { Review as AppReviewType } from '@/types'; // This will now have timestamp as number
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
@@ -14,18 +15,21 @@ import ReviewSummary from './ReviewSummary';
 import { useAuth } from '@/contexts/AuthContext';
 import { getReviewsFromFirestore, checkIfUserReviewed, type ReviewWithId as FirestoreReview } from '@/lib/firestoreService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MapPin } from 'lucide-react'; 
+import { Loader2, MapPin } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import type { Timestamp as FirestoreTimestampType } from 'firebase/firestore';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
 }
 
 const mapFirestoreReviewToAppReview = (firestoreReview: FirestoreReview): AppReviewType => {
+  // Ensure timestamp is a number (milliseconds since epoch)
+  const timestampInMillis = (firestoreReview.timestamp as FirestoreTimestampType).toMillis();
   return {
     ...firestoreReview,
-    timestamp: firestoreReview.timestamp,
+    timestamp: timestampInMillis,
   };
 };
 
@@ -43,7 +47,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     enabled: isDialogOpen,
-    select: (data) => data.map(mapFirestoreReviewToAppReview),
+    select: (data) => data.map(mapFirestoreReviewToAppReview), // Conversion happens here
     staleTime: 5 * 60 * 1000,
   });
 
@@ -128,6 +132,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <DialogDescription className="text-base">
             {restaurant.cuisine}
           </DialogDescription>
+          {/* Moved address div to be a sibling of DialogDescription */}
           <div className="flex items-center text-sm text-muted-foreground mt-1">
             <MapPin size={14} className="mr-1.5 shrink-0" />
             <span>{restaurant.address}</span>

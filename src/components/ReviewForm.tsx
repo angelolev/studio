@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import StarRating from './StarRating';
-import type { Review as AppReviewType } from '@/types';
+import type { Review as AppReviewType } from '@/types'; // AppReviewType.timestamp is now number
 import { useAuth } from '@/contexts/AuthContext';
-import { addReviewToFirestore, ReviewFirestoreData } from '@/lib/firestoreService';
+import { addReviewToFirestore, type ReviewFirestoreData, type ReviewWithId as FirestoreReviewWithId } from '@/lib/firestoreService';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import type { Timestamp as FirestoreTimestampType } from 'firebase/firestore';
+
 
 const reviewSchema = z.object({
   rating: z.number().min(1, 'Rating is required').max(5),
@@ -43,22 +45,22 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
 
   const addReviewMutation = useMutation({
     mutationFn: (reviewData: Omit<ReviewFirestoreData, 'timestamp' | 'restaurantId'>) => addReviewToFirestore(restaurantId, reviewData),
-    onSuccess: (newFirestoreReview) => {
+    onSuccess: (newFirestoreReview: FirestoreReviewWithId) => { // newFirestoreReview.timestamp is Firestore Timestamp
       toast({
         title: 'Review Submitted!',
         description: 'Thank you for your feedback.',
       });
-      // Map FirestoreReview (which has Firestore Timestamp) to AppReviewType
+      
+      // Convert Firestore Timestamp to number (milliseconds) for AppReviewType
+      const timestampInMillis = (newFirestoreReview.timestamp as FirestoreTimestampType).toMillis();
       const newAppReview: AppReviewType = {
         ...newFirestoreReview,
-        // Assuming newFirestoreReview.timestamp is already a Firestore Timestamp object
-        timestamp: newFirestoreReview.timestamp, 
+        timestamp: timestampInMillis, 
       };
       onReviewAdded(newAppReview);
       form.reset();
-      form.setValue('rating', 0); // Reset star rating display explicitly if needed
+      form.setValue('rating', 0);
       
-      // Invalidate queries to refetch reviews and user reviewed status
       queryClient.invalidateQueries({ queryKey: ['reviews', restaurantId] });
       queryClient.invalidateQueries({ queryKey: ['userReviewed', restaurantId, user?.uid] });
     },
@@ -101,8 +103,6 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
   }
 
   if (!user) {
-    // This case should ideally be handled by parent component disabling/hiding the form
-    // but as a fallback:
     return <p className="text-muted-foreground">Please sign in to leave a review.</p>;
   }
 

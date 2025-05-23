@@ -1,11 +1,10 @@
 
 'use client';
 
-import type { Review } from '@/types';
+import type { Review } from '@/types'; // Review.timestamp is now number
 import StarRating from './StarRating';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from 'date-fns';
-import type { Timestamp } from 'firebase/firestore';
 
 interface ReviewListProps {
   reviews: Review[];
@@ -16,20 +15,16 @@ export default function ReviewList({ reviews }: ReviewListProps) {
     return <p className="text-muted-foreground italic">No reviews yet. Be the first to share your thoughts!</p>;
   }
 
-  // Helper to convert Firestore Timestamp to Date for formatDistanceToNow
-  const getDateFromTimestamp = (timestamp: Timestamp | number): Date => {
-    if (typeof timestamp === 'number') {
-      return new Date(timestamp); // Assuming it's a JS timestamp (milliseconds)
-    }
-    // It's a Firestore Timestamp object
-    return timestamp.toDate();
+  // Helper to convert numeric timestamp (milliseconds) to Date for formatDistanceToNow
+  const getDateFromTimestamp = (timestampInMillis: number): Date => {
+    return new Date(timestampInMillis);
   };
 
   return (
     <div className="space-y-6">
       {reviews
-        .slice() // Create a shallow copy before sorting, as reviews prop might be read-only
-        .sort((a,b) => getDateFromTimestamp(b.timestamp).getTime() - getDateFromTimestamp(a.timestamp).getTime())
+        .slice() // Create a shallow copy before sorting
+        .sort((a,b) => b.timestamp - a.timestamp) // Sort by numeric timestamp directly
         .map((review) => (
         <div key={review.id} className="p-4 border rounded-lg bg-card/50">
           <div className="flex items-center mb-2">
