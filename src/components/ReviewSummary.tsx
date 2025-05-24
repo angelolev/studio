@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,7 +7,7 @@ import { Loader2 } from "lucide-react";
 
 interface ReviewSummaryProps {
   restaurantName: string;
-  reviews: string[]; 
+  reviews: string[];
 }
 
 export default function ReviewSummary({
@@ -50,10 +49,10 @@ export default function ReviewSummary({
 
     const timeoutId = setTimeout(() => {
       fetchSummary();
-    }, 500); 
+    }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [restaurantName, reviews]); 
+  }, [restaurantName, reviews]);
 
   if (isLoading) {
     return (
@@ -87,11 +86,11 @@ export default function ReviewSummary({
   if (reviews.length === 0 && summary) {
     // Handled
   } else if (reviews.length === 0) {
-    return null; 
+    return null;
   }
 
   return (
-    <Card className="my-6 bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/10 shadow-lg transition-all duration-500 ease-out hover:shadow-xl">
+    <Card className="bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/10 shadow-lg transition-all duration-500 ease-out hover:shadow-xl">
       <CardHeader>
         <CardTitle className="text-lg text-primary">
           Lo que piensa la gente

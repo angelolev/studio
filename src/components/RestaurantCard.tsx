@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -30,7 +29,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, MapPin } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { cuisines as allCuisines } from '@/data/cuisines';
+import { cuisines as allCuisines } from "@/data/cuisines";
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -76,7 +75,8 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     if (reviewsError) {
       toast({
         title: "Error",
-        description: "No se pudieron cargar las opiniones. Por favor, inténtalo de nuevo más tarde.",
+        description:
+          "No se pudieron cargar las opiniones. Por favor, inténtalo de nuevo más tarde.",
         variant: "destructive",
       });
     }
@@ -112,21 +112,22 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   ]);
 
   const cuisineName = useMemo(() => {
-    const foundCuisine = allCuisines.find(c => c.id === restaurant.cuisine);
+    const foundCuisine = allCuisines.find((c) => c.id === restaurant.cuisine);
     return foundCuisine ? foundCuisine.name : restaurant.cuisine;
   }, [restaurant.cuisine]);
 
   const imageHint = useMemo(() => {
-    if (restaurant.imageUrl.startsWith('https://placehold.co')) {
-      const cuisineForHint = allCuisines.find(c => c.id === restaurant.cuisine);
+    if (restaurant.imageUrl.startsWith("https://placehold.co")) {
+      const cuisineForHint = allCuisines.find(
+        (c) => c.id === restaurant.cuisine
+      );
       if (cuisineForHint && cuisineForHint.name) {
-        return cuisineForHint.name.split(' ')[0].toLowerCase();
+        return cuisineForHint.name.split(" ")[0].toLowerCase();
       }
-      return 'logo restaurante';
+      return "logo restaurante";
     }
     return undefined;
   }, [restaurant.imageUrl, restaurant.cuisine]);
-
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -137,7 +138,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (e.key === "Enter" || e.key === " ") {
               setIsDialogOpen(true);
             }
           }}
@@ -183,7 +184,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
-           <DialogDescription className="text-base">
+          <DialogDescription className="text-base">
             {cuisineName}
           </DialogDescription>
           <div className="flex items-center text-sm text-muted-foreground mt-1">
@@ -199,7 +200,6 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         </DialogHeader>
         <Separator className="my-4" />
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
-
           <ReviewSummary
             restaurantName={restaurant.name}
             reviews={reviews.map((r) => r.text)}
@@ -268,8 +268,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             !isLoadingUserReviewedCheck &&
             !showReviewForm &&
             userHasAlreadyReviewed && (
-              <p className="text-center text-sm p-4 bg-accent/10 text-accent-foreground rounded-md border border-accent/30">
-                Ya has dejado tu opinión en este restaurante. ¡Gracias por tu ayuda!
+              <p className="text-center text-sm p-4 bg-indigo-500 text-white rounded-md border border-accent/30 italic">
+                Ya has dejado tu opinión en este restaurante. ¡Gracias por tu
+                ayuda!
               </p>
             )}
         </div>
