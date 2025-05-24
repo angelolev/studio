@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,12 +16,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Restaurant, Cuisine } from '@/types';
-import { addRestaurantToFirestore, getCuisinesFromFirestore } from '@/lib/firestoreService';
+import { addRestaurantToFirestore } from '@/lib/firestoreService';
+import { cuisines } from '@/data/cuisines'; // Import local cuisines
 import { Loader2 } from 'lucide-react';
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, { message: 'Restaurant name must be at least 2 characters.' }),
-  cuisine: z.string().min(1, { message: 'Please select a cuisine/category.' }), // Changed from min(2)
+  cuisine: z.string().min(1, { message: 'Please select a cuisine/category.' }),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
 });
 
@@ -42,11 +43,12 @@ export default function AddRestaurantPage() {
     },
   });
 
-  const { data: cuisines, isLoading: isLoadingCuisines, error: cuisinesError } = useQuery<Cuisine[], Error>({
-    queryKey: ['cuisines'],
-    queryFn: getCuisinesFromFirestore,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  // No longer fetching cuisines from Firestore, using local data instead
+  // const { data: cuisines, isLoading: isLoadingCuisines, error: cuisinesError } = useQuery<Cuisine[], Error>({
+  //   queryKey: ['cuisines'],
+  //   queryFn: getCuisinesFromFirestore, // This function will be removed
+  //   staleTime: 5 * 60 * 1000, // 5 minutes
+  // });
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -55,19 +57,19 @@ export default function AddRestaurantPage() {
         description: 'You must be logged in to add a restaurant.',
         variant: 'destructive',
       });
-      router.replace('/'); 
+      router.replace('/');
     }
   }, [user, loadingAuthState, router, toast]);
 
-  useEffect(() => {
-    if (cuisinesError) {
-      toast({
-        title: 'Error Loading Cuisines',
-        description: 'Could not load cuisine options. Please try refreshing.',
-        variant: 'destructive',
-      });
-    }
-  }, [cuisinesError, toast]);
+  // useEffect(() => {
+  //   if (cuisinesError) { // No longer applicable
+  //     toast({
+  //       title: 'Error Loading Cuisines',
+  //       description: 'Could not load cuisine options. Please try refreshing.',
+  //       variant: 'destructive',
+  //     });
+  //   }
+  // }, [cuisinesError, toast]);
 
   const mutation = useMutation({
     mutationFn: (newRestaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>) => addRestaurantToFirestore(newRestaurantData),
@@ -78,7 +80,7 @@ export default function AddRestaurantPage() {
       });
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       form.reset();
-      router.push('/'); 
+      router.push('/');
     },
     onError: (error) => {
       toast({
@@ -144,21 +146,21 @@ export default function AddRestaurantPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cuisine / Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingCuisines || !cuisines}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={isLoadingCuisines ? "Loading cuisines..." : "Select a cuisine"} />
+                          <SelectValue placeholder={"Select a cuisine"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {cuisines && cuisines.length > 0 ? (
-                          cuisines.map((cuisine) => (
-                            <SelectItem key={cuisine.id} value={cuisine.id}>
-                              {cuisine.name}
+                          cuisines.map((cuisineItem) => (
+                            <SelectItem key={cuisineItem.id} value={cuisineItem.id}>
+                              {cuisineItem.name}
                             </SelectItem>
                           ))
                         ) : (
-                          !isLoadingCuisines && <SelectItem value="disabled" disabled>No cuisines available</SelectItem>
+                          <SelectItem value="disabled" disabled>No cuisines available</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -179,7 +181,7 @@ export default function AddRestaurantPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={mutation.isPending || isLoadingCuisines}>
+              <Button type="submit" className="w-full" disabled={mutation.isPending}>
                 {mutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -196,4 +198,3 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
-

@@ -1,0 +1,32 @@
+
+import type { Cuisine } from '@/types';
+
+export const cuisines: Cuisine[] = [
+  { id: 'american', name: 'American' },
+  { id: 'bbq', name: 'BBQ' },
+  { id: 'bakery', name: 'Bakery' },
+  { id: 'breakfast', name: 'Breakfast' },
+  { id: 'burgers', name: 'Burgers' },
+  { id: 'cafe', name: 'Cafe' },
+  { id: 'chinese', name: 'Chinese' },
+  { id: 'desserts', name: 'Desserts' },
+  { id: 'fast_food', name: 'Fast Food' },
+  { id: 'indian', name: 'Indian' },
+  { id: 'italian', name: 'Italian' },
+  { id: 'japanese', name: 'Japanese' },
+  { id: 'korean', name: 'Korean' },
+  { id: 'latin_american', name: 'Latin American' },
+  { id: 'mediterranean', name: 'Mediterranean' },
+  { id: 'mexican', name: 'Mexican' },
+  { id: 'middle_eastern', name: 'Middle Eastern' },
+  { id: 'pizza', name: 'Pizza' },
+  { id: 'pollo_a_la_brasa', name: 'Pollo a la Brasa' },
+  { id: 'seafood', name: 'Seafood' },
+  { id: 'sandwiches', name: 'Sandwiches' },
+  { id: 'sushi', name: 'Sushi' },
+  { id: 'thai', name: 'Thai' },
+  { id: 'vegan', name: 'Vegan' },
+  { id: 'vegetarian', name: 'Vegetarian' },
+  { id: 'vietnamese', name: 'Vietnamese' },
+  { id: 'other', name: 'Other' },
+];

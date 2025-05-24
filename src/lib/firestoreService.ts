@@ -1,5 +1,5 @@
 
-"use server"; 
+"use server";
 
 import { db } from "@/lib/firebase";
 import type { Review as AppReviewType, Restaurant as AppRestaurantType, Cuisine as AppCuisineType } from "@/types";
@@ -13,8 +13,8 @@ import {
   getCountFromServer,
   getDocs,
   serverTimestamp,
-  doc, 
-  setDoc, 
+  doc,
+  setDoc,
 } from "firebase/firestore";
 
 // --- Review Types and Functions ---
@@ -89,7 +89,7 @@ export async function getReviewsFromFirestore(
     return {
       id: doc.id,
       ...data,
-      timestamp: timestamp ? timestamp.toMillis() : Date.now(), 
+      timestamp: timestamp ? timestamp.toMillis() : Date.now(),
     } as ReviewWithNumericTimestamp;
   });
 }
@@ -109,7 +109,7 @@ export async function checkIfUserReviewed(
 
 export interface RestaurantFirestoreData {
   name: string;
-  cuisine: string; // Value from the dropdown (e.g., 'italian', 'mexican')
+  cuisine: string; // Value from the dropdown (e.g., 'italian', 'mexican') - this is the ID from cuisines.ts
   address: string;
   imageUrl: string;
   description: string;
@@ -118,18 +118,18 @@ export interface RestaurantFirestoreData {
 
 export interface RestaurantWithNumericTimestamp extends Omit<AppRestaurantType, 'id'> {
   id: string;
-  createdAt?: number; 
+  createdAt?: number;
 }
 
 export async function addRestaurantToFirestore(
   restaurantData: Pick<AppRestaurantType, 'name' | 'cuisine' | 'address'>
-): Promise<AppRestaurantType> { 
-  
+): Promise<AppRestaurantType> {
+
   const restaurantColRef = collection(db, "restaurants");
 
   const docData: RestaurantFirestoreData = {
     ...restaurantData,
-    imageUrl: 'https://placehold.co/600x400.png', 
+    imageUrl: 'https://placehold.co/600x400.png',
     description: `A restaurant specializing in ${restaurantData.cuisine}, located at ${restaurantData.address}.`,
     createdAt: serverTimestamp(),
   };
@@ -139,7 +139,7 @@ export async function addRestaurantToFirestore(
   return {
     id: docRef.id,
     name: restaurantData.name,
-    cuisine: restaurantData.cuisine,
+    cuisine: restaurantData.cuisine, // This will be the cuisine ID, e.g., "italian"
     address: restaurantData.address,
     imageUrl: docData.imageUrl,
     description: docData.description,
@@ -148,41 +148,24 @@ export async function addRestaurantToFirestore(
 
 export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]> {
   const restaurantColRef = collection(db, "restaurants");
-  const q = query(restaurantColRef, orderBy("name", "asc")); 
-  
+  const q = query(restaurantColRef, orderBy("name", "asc"));
+
   const querySnapshot = await getDocs(q);
-  
+
   return querySnapshot.docs.map((doc) => {
     const data = doc.data() as RestaurantFirestoreData;
     return {
       id: doc.id,
       name: data.name,
-      cuisine: data.cuisine,
+      cuisine: data.cuisine, // This is the cuisine ID
       address: data.address,
       imageUrl: data.imageUrl,
       description: data.description,
-    } as AppRestaurantType; 
+    } as AppRestaurantType;
   });
 }
 
 // --- Cuisine Types and Functions ---
-export interface CuisineFirestoreData {
-  name: string;
-  // Potentially other fields like 'icon', 'description' in the future
-}
+// getCuisinesFromFirestore function removed as cuisines are now sourced locally.
+// The AppCuisineType is still defined in src/types/index.ts and used by the local data file.
 
-// Function to get all cuisines from Firestore
-export async function getCuisinesFromFirestore(): Promise<AppCuisineType[]> {
-  const cuisinesColRef = collection(db, "cuisines");
-  const q = query(cuisinesColRef, orderBy("name", "asc")); // Order by name for consistent dropdown display
-  
-  const querySnapshot = await getDocs(q);
-  
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data() as CuisineFirestoreData;
-    return {
-      id: doc.id, // The document ID (e.g., "italian", "mexican")
-      name: data.name, // The display name (e.g., "Italian", "Mexican")
-    } as AppCuisineType;
-  });
-}
