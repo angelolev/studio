@@ -235,7 +235,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           )}
 
           {!loadingAuthState && !user && (
-            <p className="text-center text-sm p-4 bg-accent/10 text-accent-foreground rounded-md border border-accent/30">
+            <p className="text-left italic text-sm p-2 text-indigo-500 font-bold text-accent-foreground">
               Inicia sesión para dejar tu opinión.
             </p>
           )}
