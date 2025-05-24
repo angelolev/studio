@@ -276,7 +276,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             !isLoadingUserReviewedCheck &&
             !showReviewForm &&
             userHasAlreadyReviewed && (
-              <p className="text-center text-sm p-4 bg-indigo-500 text-white rounded-md border border-accent/30 italic">
+              <p className="text-left italic text-sm p-2 text-indigo-500 font-bold text-accent-foreground">
                 Ya has dejado tu opinión en este restaurante. ¡Gracias por tu
                 ayuda!
               </p>

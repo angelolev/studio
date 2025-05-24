@@ -1,20 +1,18 @@
 
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Lato } from 'next/font/google'; // Changed from Geist
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/Header';
 import AppProviders from '@/components/AppProviders';
-import FloatingAddButton from '@/components/FloatingAddButton'; // Import the new button
+import FloatingAddButton from '@/components/FloatingAddButton';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+// Configure Lato font
+const lato = Lato({
+  variable: '--font-lato',
   subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
+  weight: ['400', '700'], // Include desired weights
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -30,12 +28,12 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
+        className={`${lato.variable} antialiased font-sans`} // Use Lato variable and font-sans
       >
         <AppProviders>
           <Header />
           <main className="container mx-auto px-4 py-8">{children}</main>
-          <FloatingAddButton /> {/* Add the button here */}
+          <FloatingAddButton />
           <Toaster />
         </AppProviders>
       </body>
