@@ -30,6 +30,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, MapPin } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { cuisines as allCuisines } from '@/data/cuisines'; // Import local cuisines
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -57,7 +58,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     select: (data) =>
       data.map((review) => ({
         ...review,
-        timestamp: review.timestamp, 
+        timestamp: review.timestamp,
       })),
   });
 
@@ -110,6 +111,23 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     isLoadingUserReviewedCheck,
   ]);
 
+  const cuisineName = useMemo(() => {
+    const foundCuisine = allCuisines.find(c => c.id === restaurant.cuisine);
+    return foundCuisine ? foundCuisine.name : restaurant.cuisine; // Fallback to ID if not found
+  }, [restaurant.cuisine]);
+
+  const imageHint = useMemo(() => {
+    if (restaurant.imageUrl.startsWith('https://placehold.co')) {
+      const cuisineForHint = allCuisines.find(c => c.id === restaurant.cuisine);
+      if (cuisineForHint && cuisineForHint.name) {
+        return cuisineForHint.name.split(' ')[0].toLowerCase();
+      }
+      return 'restaurant logo';
+    }
+    return undefined; // No hint if it's not a placeholder
+  }, [restaurant.imageUrl, restaurant.cuisine]);
+
+
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
@@ -117,7 +135,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           className="flex items-center p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg w-full cursor-pointer"
           aria-label={`View details and reviews for ${restaurant.name}`}
           role="button"
-          tabIndex={0} 
+          tabIndex={0}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               setIsDialogOpen(true);
@@ -131,7 +149,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               width={64}
               height={64}
               className="rounded-md object-cover aspect-square"
-              data-ai-hint="restaurant logo"
+              data-ai-hint={imageHint}
             />
           </div>
 
@@ -144,9 +162,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             </h3>
             <p
               className="text-xs sm:text-sm text-muted-foreground truncate"
-              title={restaurant.cuisine}
+              title={cuisineName}
             >
-              {restaurant.cuisine}
+              {cuisineName}
             </p>
           </div>
 
@@ -165,8 +183,8 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
-          <DialogDescription className="text-base">
-            {restaurant.cuisine}
+           <DialogDescription className="text-base">
+            {cuisineName}
           </DialogDescription>
           <div className="flex items-center text-sm text-muted-foreground mt-1">
             <MapPin size={14} className="mr-1.5 shrink-0" />
@@ -181,7 +199,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         </DialogHeader>
         <Separator className="my-4" />
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
-          
+
           <ReviewSummary
             restaurantName={restaurant.name}
             reviews={reviews.map((r) => r.text)}
@@ -265,3 +283,4 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
+
