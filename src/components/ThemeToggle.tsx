@@ -8,7 +8,7 @@ import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 
 export function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme(); // Use resolvedTheme
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -16,11 +16,13 @@ export function ThemeToggle() {
   }, []);
 
   if (!mounted) {
+    // Render a disabled button or null during SSR and initial client render to avoid hydration mismatch
     return <Button variant="ghost" size="icon" disabled className="h-10 w-10" />;
   }
 
   const toggleTheme = () => {
-    if (theme === 'dark') {
+    // Toggle based on the currently resolved theme
+    if (resolvedTheme === 'dark') {
       setTheme('light');
     } else {
       setTheme('dark');
@@ -29,7 +31,7 @@ export function ThemeToggle() {
 
   return (
     <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Cambiar tema">
-      {theme === 'dark' ? (
+      {resolvedTheme === 'dark' ? (
         <Sun className="h-[1.2rem] w-[1.2rem] transition-all" />
       ) : (
         <Moon className="h-[1.2rem] w-[1.2rem] transition-all" />
@@ -38,3 +40,4 @@ export function ThemeToggle() {
     </Button>
   );
 }
+

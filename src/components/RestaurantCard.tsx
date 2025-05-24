@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -52,8 +53,8 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   } = useQuery<ReviewWithNumericTimestamp[], Error, AppReviewType[]>({
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
-    enabled: isDialogOpen,
-    staleTime: 5 * 60 * 1000,
+    // enabled: isDialogOpen, // Removed to load reviews immediately for card display
+    staleTime: 5 * 60 * 1000, // 5 minutes
     select: (data) =>
       data.map((review) => ({
         ...review,
@@ -67,7 +68,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   } = useQuery<boolean, Error>({
     queryKey: userReviewedQueryKey,
     queryFn: () => checkIfUserReviewed(restaurant.id, user!.uid),
-    enabled: isDialogOpen && !!user && !loadingAuthState,
+    enabled: isDialogOpen && !!user && !loadingAuthState, // Only check when dialog is open and user is available
     staleTime: 5 * 60 * 1000,
   });
 
@@ -76,7 +77,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       toast({
         title: "Error",
         description:
-          "No se pudieron cargar las opiniones. Por favor, inténtalo de nuevo más tarde.",
+          "No se pudieron cargar las opiniones para este restaurante.",
         variant: "destructive",
       });
     }
@@ -122,11 +123,13 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         (c) => c.id === restaurant.cuisine
       );
       if (cuisineForHint && cuisineForHint.name) {
+        // Take the first word of the cuisine name for a more specific hint
         return cuisineForHint.name.split(" ")[0].toLowerCase();
       }
+      // Fallback for "Otro" or if cuisine name is not found/simple
       return "logo restaurante";
     }
-    return undefined;
+    return undefined; // No hint if it's a real image
   }, [restaurant.imageUrl, restaurant.cuisine]);
 
   return (
@@ -168,12 +171,17 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               {cuisineName}
             </p>
           </div>
-
+          
+          {/* Rating section - clickable part of the Card */}
           <div
             className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto"
             aria-label={`Ver detalles y opiniones de ${restaurant.name}`}
           >
-            <StarRating rating={averageRating} readOnly size={16} />
+            {isLoadingReviews && !isDialogOpen ? ( // Show mini-loader only if dialog is not open
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            ) : (
+              <StarRating rating={averageRating} readOnly size={16} />
+            )}
             <span className="text-xs text-muted-foreground mt-0.5">
               ({reviewCount} opinion{reviewCount === 1 ? "" : "es"})
             </span>
@@ -185,7 +193,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         <DialogHeader>
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
           <DialogDescription className="text-base">
-            {cuisineName}
+             {cuisineName}
           </DialogDescription>
           <div className="flex items-center text-sm text-muted-foreground mt-1">
             <MapPin size={14} className="mr-1.5 shrink-0" />
@@ -283,3 +291,4 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
+
