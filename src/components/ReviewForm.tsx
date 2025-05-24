@@ -17,8 +17,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 
 const reviewSchema = z.object({
-  rating: z.number().min(1, 'Rating is required').max(5),
-  text: z.string().min(10, 'Review must be at least 10 characters').max(500, 'Review must be less than 500 characters'),
+  rating: z.number().min(1, 'La calificación es requerida').max(5),
+  text: z.string().min(10, 'La opinión debe tener al menos 10 caracteres').max(500, 'La opinión debe tener menos de 500 caracteres'),
 });
 
 type ReviewFormData = z.infer<typeof reviewSchema>;
@@ -45,8 +45,8 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
     mutationFn: (reviewData: Omit<ReviewFirestoreData, 'timestamp' | 'restaurantId'>) => addReviewToFirestore(restaurantId, reviewData),
     onSuccess: (newPlainReview: AddedReviewPlain) => { 
       toast({
-        title: 'Review Submitted!',
-        description: 'Thank you for your feedback.',
+        title: '¡Opinión Enviada!',
+        description: 'Gracias por tus comentarios.',
       });
       
       const newAppReview: AppReviewType = {
@@ -70,7 +70,7 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
     onError: (error: Error) => {
       toast({
         title: 'Error',
-        description: error.message || 'Could not submit review.',
+        description: error.message || 'No se pudo enviar la opinión.',
         variant: 'destructive',
       });
     },
@@ -79,8 +79,8 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
   const onSubmit: SubmitHandler<ReviewFormData> = (data) => {
     if (!user) {
       toast({
-        title: 'Authentication Required',
-        description: 'Please sign in to leave a review.',
+        title: 'Autenticación Requerida',
+        description: 'Por favor, inicia sesión para dejar una opinión.',
         variant: 'destructive',
       });
       return;
@@ -100,13 +100,13 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
     return (
       <div className="flex items-center justify-center p-4 my-4 min-h-[100px]">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <p className="ml-2 text-muted-foreground">Loading form...</p>
+        <p className="ml-2 text-muted-foreground">Cargando formulario...</p>
       </div>
     );
   }
 
   if (!user) {
-    return <p className="text-muted-foreground">Please sign in to leave a review.</p>;
+    return <p className="text-muted-foreground">Por favor, inicia sesión para dejar una opinión.</p>;
   }
 
   return (
@@ -117,7 +117,7 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
           name="rating"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Your Rating</FormLabel>
+              <FormLabel>Tu Calificación</FormLabel>
               <FormControl>
                 <StarRating
                   rating={field.value}
@@ -135,9 +135,9 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
           name="text"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Your Review</FormLabel>
+              <FormLabel>Tu Opinión</FormLabel>
               <FormControl>
-                <Textarea placeholder="Tell us about your experience..." {...field} rows={4} className="bg-card" />
+                <Textarea placeholder="Cuéntanos sobre tu experiencia..." {...field} rows={4} className="bg-card" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -147,9 +147,9 @@ export default function ReviewForm({ restaurantId, onReviewAdded }: ReviewFormPr
           {addReviewMutation.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting...
+              Enviando...
             </>
-          ) : 'Submit Review'}
+          ) : 'Enviar Opinión'}
         </Button>
       </form>
     </Form>

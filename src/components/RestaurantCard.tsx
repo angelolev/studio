@@ -30,7 +30,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, MapPin } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { cuisines as allCuisines } from '@/data/cuisines'; // Import local cuisines
+import { cuisines as allCuisines } from '@/data/cuisines';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -76,7 +76,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     if (reviewsError) {
       toast({
         title: "Error",
-        description: "Could not load reviews. Please try again later.",
+        description: "No se pudieron cargar las opiniones. Por favor, inténtalo de nuevo más tarde.",
         variant: "destructive",
       });
     }
@@ -113,7 +113,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
   const cuisineName = useMemo(() => {
     const foundCuisine = allCuisines.find(c => c.id === restaurant.cuisine);
-    return foundCuisine ? foundCuisine.name : restaurant.cuisine; // Fallback to ID if not found
+    return foundCuisine ? foundCuisine.name : restaurant.cuisine;
   }, [restaurant.cuisine]);
 
   const imageHint = useMemo(() => {
@@ -122,9 +122,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       if (cuisineForHint && cuisineForHint.name) {
         return cuisineForHint.name.split(' ')[0].toLowerCase();
       }
-      return 'restaurant logo';
+      return 'logo restaurante';
     }
-    return undefined; // No hint if it's not a placeholder
+    return undefined;
   }, [restaurant.imageUrl, restaurant.cuisine]);
 
 
@@ -133,7 +133,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       <DialogTrigger asChild>
         <Card
           className="flex items-center p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg w-full cursor-pointer"
-          aria-label={`View details and reviews for ${restaurant.name}`}
+          aria-label={`Ver detalles y opiniones de ${restaurant.name}`}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
@@ -170,7 +170,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
           <div
             className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto"
-            aria-label={`View reviews and details for ${restaurant.name}`}
+            aria-label={`Ver detalles y opiniones de ${restaurant.name}`}
           >
             <StarRating rating={averageRating} readOnly size={16} />
             <span className="text-xs text-muted-foreground mt-0.5">
@@ -207,7 +207,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
           <div>
             <h3 className="text-lg font-semibold mb-3 text-foreground">
-              Reviews
+              Opiniones
             </h3>
             {isLoadingReviews && (
               <div className="flex items-center justify-center p-4 my-4 min-h-[100px]">
@@ -255,7 +255,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             showReviewForm && (
               <div>
                 <h3 className="text-lg font-semibold mb-3 text-foreground">
-                  Leave a Review
+                  Deja tu Opinión
                 </h3>
                 <ReviewForm
                   restaurantId={restaurant.id}
@@ -269,8 +269,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             !showReviewForm &&
             userHasAlreadyReviewed && (
               <p className="text-center text-sm p-4 bg-accent/10 text-accent-foreground rounded-md border border-accent/30">
-                Ya has dejado tu opinión en este restaurante. Gracias por tu
-                ayuda!
+                Ya has dejado tu opinión en este restaurante. ¡Gracias por tu ayuda!
               </p>
             )}
         </div>
@@ -283,4 +282,3 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
-

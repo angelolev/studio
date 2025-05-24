@@ -22,23 +22,19 @@ export default function FloatingAddButton() {
   const handleAddRestaurantClick = () => {
     if (!user && !loadingAuthState) {
       toast({
-        title: 'Authentication Required',
-        description: 'Please sign in to add a new restaurant.',
+        title: 'Autenticación Requerida',
+        description: 'Por favor, inicia sesión para agregar un nuevo restaurante.',
         action: <Button onClick={async () => {
           try {
             await signInWithGoogle();
-            // User will be redirected if they were trying to access /add-restaurant
-            // or they can click the button again.
-            // For a more seamless UX, could store intended path before login.
           } catch (error) {
             // signInWithGoogle in AuthContext should handle its own errors
           }
-        }}>Sign In</Button>,
+        }}>Iniciar Sesión</Button>,
       });
     } else if (user) {
       router.push('/add-restaurant');
     }
-    // If loadingAuthState, button might be disabled or show a spinner, handled by its disabled state
   };
 
   return (
@@ -52,14 +48,14 @@ export default function FloatingAddButton() {
                        bg-primary hover:bg-primary/90 text-primary-foreground
                        transition-transform hover:scale-110 active:scale-95"
             onClick={handleAddRestaurantClick}
-            aria-label="Add new restaurant"
+            aria-label="Agregar nuevo restaurante"
             disabled={loadingAuthState}
           >
             <PlusCircle className="h-7 w-7" />
           </Button>
         </TooltipTrigger>
         <TooltipContent side="left" className="bg-primary text-primary-foreground">
-          <p>Add Restaurant</p>
+          <p>Agregar Restaurante</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

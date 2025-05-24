@@ -1,25 +1,26 @@
+
 // SummarizeReviews.ts
 'use server';
 
 /**
- * @fileOverview Summarizes user reviews for a restaurant.
+ * @fileOverview Resume las opiniones de los usuarios para un restaurante.
  *
- * - summarizeReviews - A function that summarizes reviews for a given restaurant.
- * - SummarizeReviewsInput - The input type for the summarizeReviews function.
- * - SummarizeReviewsOutput - The return type for the summarizeReviews function.
+ * - summarizeReviews - Una función que resume las opiniones para un restaurante dado.
+ * - SummarizeReviewsInput - El tipo de entrada para la función summarizeReviews.
+ * - SummarizeReviewsOutput - El tipo de retorno para la función summarizeReviews.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SummarizeReviewsInputSchema = z.object({
-  restaurantName: z.string().describe('The name of the restaurant.'),
-  reviews: z.array(z.string()).describe('An array of user reviews for the restaurant.'),
+  restaurantName: z.string().describe('El nombre del restaurante.'),
+  reviews: z.array(z.string()).describe('Un arreglo de opiniones de usuarios para el restaurante.'),
 });
 export type SummarizeReviewsInput = z.infer<typeof SummarizeReviewsInputSchema>;
 
 const SummarizeReviewsOutputSchema = z.object({
-  summary: z.string().describe('A summarized sentiment of previous reviews.'),
+  summary: z.string().describe('Un sentimiento resumido de las opiniones anteriores.'),
 });
 export type SummarizeReviewsOutput = z.infer<typeof SummarizeReviewsOutputSchema>;
 

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,7 +8,7 @@ import { Loader2 } from "lucide-react";
 
 interface ReviewSummaryProps {
   restaurantName: string;
-  reviews: string[]; // Expecting an array of review texts
+  reviews: string[]; 
 }
 
 export default function ReviewSummary({
@@ -28,7 +29,6 @@ export default function ReviewSummary({
         return;
       }
       if (reviews.length < 2) {
-        // Optional: only summarize if more than X reviews
         setSummary("Necesitamos más opiniones para generar un resumen.");
         setIsLoading(false);
         return;
@@ -37,26 +37,23 @@ export default function ReviewSummary({
       setIsLoading(true);
       setError(null);
       try {
-        // The summarizeReviews flow expects an array of review texts.
         const result = await summarizeReviews({ restaurantName, reviews });
         setSummary(result.summary);
       } catch (err) {
-        console.error("Error fetching review summary:", err);
-        setError("Could not load review summary at this time.");
+        console.error("Error al obtener el resumen de opiniones:", err);
+        setError("No se pudo cargar el resumen de opiniones en este momento.");
         setSummary(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    // Debounce or ensure reviews array is stable before fetching
-    // For simplicity, fetching directly. Consider debouncing in a real app if `reviews` changes frequently.
     const timeoutId = setTimeout(() => {
       fetchSummary();
-    }, 500); // Small delay to avoid rapid calls if reviews prop updates fast
+    }, 500); 
 
     return () => clearTimeout(timeoutId);
-  }, [restaurantName, reviews]); // Dependency on reviews (the array of texts)
+  }, [restaurantName, reviews]); 
 
   if (isLoading) {
     return (
@@ -87,11 +84,10 @@ export default function ReviewSummary({
     );
   }
 
-  // If no reviews, and summary is already set to a message like "Not enough reviews..."
   if (reviews.length === 0 && summary) {
-    // Display the specific message set in useEffect for 0 reviews
+    // Handled
   } else if (reviews.length === 0) {
-    return null; // Or specific "no reviews yet" message if summary hasn't been set
+    return null; 
   }
 
   return (
@@ -107,7 +103,6 @@ export default function ReviewSummary({
             {summary}
           </p>
         ) : (
-          // This case should be less common now due to handling in useEffect
           <p className="text-sm text-muted-foreground italic">
             Cargando resumen o no hay suficientes datos.
           </p>

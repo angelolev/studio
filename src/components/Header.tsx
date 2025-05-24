@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from './ThemeToggle';
-// Removed useRouter, PlusCircle, useToast as "Add Restaurant" button is moved
 
 export default function Header() {
   const { user, loadingAuthState, signInWithGoogle, signOut } = useAuth();
@@ -29,15 +28,14 @@ export default function Header() {
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          {/* "Add Restaurant" button removed from here */}
           {loadingAuthState ? (
-            <Button variant="outline" disabled>Loading...</Button>
+            <Button variant="outline" disabled>Cargando...</Button>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
+                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'Usuario'} />
                     <AvatarFallback>
                       {user.displayName ? user.displayName.charAt(0).toUpperCase() : <UserCircle size={20}/>}
                     </AvatarFallback>
@@ -48,7 +46,7 @@ export default function Header() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
-                      {user.displayName || 'Authenticated User'}
+                      {user.displayName || 'Usuario Autenticado'}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
@@ -58,14 +56,14 @@ export default function Header() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
+                  Cerrar Sesión
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <Button variant="outline" onClick={signInWithGoogle}>
               <LogIn className="mr-2 h-4 w-4" />
-              Sign In with Google
+              Iniciar Sesión con Google
             </Button>
           )}
         </div>

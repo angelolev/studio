@@ -55,7 +55,7 @@ export async function addReviewToFirestore(
   reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId">
 ): Promise<AddedReviewPlain> {
   if (!reviewData.userId) {
-    throw new Error("User ID is required to add a review.");
+    throw new Error("Se requiere ID de usuario para agregar una opinión.");
   }
   const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
   const docData = {
@@ -109,7 +109,7 @@ export async function checkIfUserReviewed(
 
 export interface RestaurantFirestoreData {
   name: string;
-  cuisine: string; // Value from the dropdown (e.g., 'italian', 'mexican') - this is the ID from cuisines.ts
+  cuisine: string; 
   address: string;
   imageUrl: string;
   description: string;
@@ -130,7 +130,7 @@ export async function addRestaurantToFirestore(
   const docData: RestaurantFirestoreData = {
     ...restaurantData,
     imageUrl: 'https://placehold.co/600x400.png',
-    description: `A restaurant specializing in ${restaurantData.cuisine}, located at ${restaurantData.address}.`,
+    description: `Un restaurante especializado en ${restaurantData.cuisine}, ubicado en ${restaurantData.address}.`,
     createdAt: serverTimestamp(),
   };
 
@@ -139,7 +139,7 @@ export async function addRestaurantToFirestore(
   return {
     id: docRef.id,
     name: restaurantData.name,
-    cuisine: restaurantData.cuisine, // This will be the cuisine ID, e.g., "italian"
+    cuisine: restaurantData.cuisine,
     address: restaurantData.address,
     imageUrl: docData.imageUrl,
     description: docData.description,
@@ -157,15 +157,10 @@ export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]
     return {
       id: doc.id,
       name: data.name,
-      cuisine: data.cuisine, // This is the cuisine ID
+      cuisine: data.cuisine, 
       address: data.address,
       imageUrl: data.imageUrl,
       description: data.description,
     } as AppRestaurantType;
   });
 }
-
-// --- Cuisine Types and Functions ---
-// getCuisinesFromFirestore function removed as cuisines are now sourced locally.
-// The AppCuisineType is still defined in src/types/index.ts and used by the local data file.
-

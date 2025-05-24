@@ -16,7 +16,6 @@ export function ThemeToggle() {
   }, []);
 
   if (!mounted) {
-    // Render a placeholder or null to avoid hydration mismatch
     return <Button variant="ghost" size="icon" disabled className="h-10 w-10" />;
   }
 
@@ -29,13 +28,13 @@ export function ThemeToggle() {
   };
 
   return (
-    <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+    <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Cambiar tema">
       {theme === 'dark' ? (
         <Sun className="h-[1.2rem] w-[1.2rem] transition-all" />
       ) : (
         <Moon className="h-[1.2rem] w-[1.2rem] transition-all" />
       )}
-      <span className="sr-only">Toggle theme</span>
+      <span className="sr-only">Cambiar tema</span>
     </Button>
   );
 }

@@ -15,15 +15,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Restaurant, Cuisine } from '@/types';
+import type { Restaurant } from '@/types';
 import { addRestaurantToFirestore } from '@/lib/firestoreService';
-import { cuisines } from '@/data/cuisines'; // Import local cuisines
+import { cuisines } from '@/data/cuisines'; 
 import { Loader2 } from 'lucide-react';
 
 const addRestaurantSchema = z.object({
-  name: z.string().min(2, { message: 'Restaurant name must be at least 2 characters.' }),
-  cuisine: z.string().min(1, { message: 'Please select a cuisine/category.' }),
-  address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
+  name: z.string().min(2, { message: 'El nombre del restaurante debe tener al menos 2 caracteres.' }),
+  cuisine: z.string().min(1, { message: 'Por favor, selecciona una cocina/categoría.' }),
+  address: z.string().min(5, { message: 'La dirección debe tener al menos 5 caracteres.' }),
 });
 
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
@@ -43,40 +43,23 @@ export default function AddRestaurantPage() {
     },
   });
 
-  // No longer fetching cuisines from Firestore, using local data instead
-  // const { data: cuisines, isLoading: isLoadingCuisines, error: cuisinesError } = useQuery<Cuisine[], Error>({
-  //   queryKey: ['cuisines'],
-  //   queryFn: getCuisinesFromFirestore, // This function will be removed
-  //   staleTime: 5 * 60 * 1000, // 5 minutes
-  // });
-
   useEffect(() => {
     if (!loadingAuthState && !user) {
       toast({
-        title: 'Access Denied',
-        description: 'You must be logged in to add a restaurant.',
+        title: 'Acceso Denegado',
+        description: 'Debes iniciar sesión para agregar un restaurante.',
         variant: 'destructive',
       });
       router.replace('/');
     }
   }, [user, loadingAuthState, router, toast]);
 
-  // useEffect(() => {
-  //   if (cuisinesError) { // No longer applicable
-  //     toast({
-  //       title: 'Error Loading Cuisines',
-  //       description: 'Could not load cuisine options. Please try refreshing.',
-  //       variant: 'destructive',
-  //     });
-  //   }
-  // }, [cuisinesError, toast]);
-
   const mutation = useMutation({
     mutationFn: (newRestaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>) => addRestaurantToFirestore(newRestaurantData),
     onSuccess: (data) => {
       toast({
-        title: 'Restaurant Added!',
-        description: `${data.name} has been successfully added to the list.`,
+        title: '¡Restaurante Agregado!',
+        description: `${data.name} ha sido agregado exitosamente a la lista.`,
       });
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       form.reset();
@@ -84,8 +67,8 @@ export default function AddRestaurantPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Error Adding Restaurant',
-        description: error.message || 'Could not add the restaurant. Please try again.',
+        title: 'Error al Agregar Restaurante',
+        description: error.message || 'No se pudo agregar el restaurante. Por favor, intenta de nuevo.',
         variant: 'destructive',
       });
     },
@@ -100,7 +83,7 @@ export default function AddRestaurantPage() {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-3 text-lg">Loading authentication state...</p>
+        <p className="ml-3 text-lg">Cargando estado de autenticación...</p>
       </div>
     );
   }
@@ -108,9 +91,9 @@ export default function AddRestaurantPage() {
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-        <p className="text-lg text-destructive">Access Denied.</p>
-        <p className="text-muted-foreground">Please log in to add a restaurant.</p>
-        <Button onClick={() => router.push('/')} className="mt-4">Go to Homepage</Button>
+        <p className="text-lg text-destructive">Acceso Denegado.</p>
+        <p className="text-muted-foreground">Por favor, inicia sesión para agregar un restaurante.</p>
+        <Button onClick={() => router.push('/')} className="mt-4">Ir a la Página Principal</Button>
       </div>
     );
   }
@@ -119,9 +102,9 @@ export default function AddRestaurantPage() {
     <div className="max-w-2xl mx-auto py-8">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Add a New Restaurant</CardTitle>
+          <CardTitle className="text-2xl">Agregar un Nuevo Restaurante</CardTitle>
           <CardDescription>
-            Fill in the details below to add a new restaurant to our list.
+            Completa los detalles a continuación para agregar un nuevo restaurante a nuestra lista.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -132,9 +115,9 @@ export default function AddRestaurantPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Restaurant Name</FormLabel>
+                    <FormLabel>Nombre del Restaurante</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., The Gourmet Place" {...field} />
+                      <Input placeholder="Ej: El Lugar Gourmet" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -145,11 +128,11 @@ export default function AddRestaurantPage() {
                 name="cuisine"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cuisine / Category</FormLabel>
+                    <FormLabel>Cocina / Categoría</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={"Select a cuisine"} />
+                          <SelectValue placeholder={"Selecciona una cocina"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -160,7 +143,7 @@ export default function AddRestaurantPage() {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="disabled" disabled>No cuisines available</SelectItem>
+                          <SelectItem value="disabled" disabled>No hay cocinas disponibles</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -173,9 +156,9 @@ export default function AddRestaurantPage() {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address</FormLabel>
+                    <FormLabel>Dirección</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., 123 Main St, Anytown" {...field} />
+                      <Input placeholder="Ej: Calle Principal 123, Cualquier Ciudad" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -185,10 +168,10 @@ export default function AddRestaurantPage() {
                 {mutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding...
+                    Agregando...
                   </>
                 ) : (
-                  'Add Restaurant'
+                  'Agregar Restaurante'
                 )}
               </Button>
             </form>

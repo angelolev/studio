@@ -19,7 +19,7 @@ export default function RestaurantGrid() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Loading restaurants...</p>
+        <p className="text-lg text-muted-foreground">Cargando restaurantes...</p>
       </div>
     );
   }
@@ -27,9 +27,9 @@ export default function RestaurantGrid() {
   if (isError) {
     return (
        <Alert variant="destructive" className="max-w-2xl mx-auto my-8">
-          <AlertTitle>Error Loading Restaurants</AlertTitle>
+          <AlertTitle>Error al Cargar Restaurantes</AlertTitle>
           <AlertDescription>
-            We couldn't fetch the list of restaurants at this moment. Error: {error?.message || 'Unknown error'}. Please try again later.
+            No pudimos cargar la lista de restaurantes en este momento. Error: {error?.message || 'Error desconocido'}. Por favor, intenta de nuevo más tarde.
           </AlertDescription>
         </Alert>
     );
@@ -38,9 +38,9 @@ export default function RestaurantGrid() {
   if (!restaurants || restaurants.length === 0) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-semibold mb-3">No Restaurants Found</h2>
+        <h2 className="text-2xl font-semibold mb-3">No se Encontraron Restaurantes</h2>
         <p className="text-muted-foreground">
-          It looks like there are no restaurants listed yet. Why not add the first one?
+          Parece que aún no hay restaurantes listados. ¿Por qué no agregas el primero?
         </p>
       </div>
     );
