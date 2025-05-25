@@ -13,21 +13,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Restaurant } from '@/types';
 import { addRestaurantToFirestore } from '@/lib/firestoreService';
 import { cuisines as allCuisines } from '@/data/cuisines';
-import { Loader2, Camera, UploadCloud, Video, VideoOff, ChevronDown } from 'lucide-react';
+import { Loader2, Camera, UploadCloud, Video, VideoOff } from 'lucide-react';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -73,12 +65,6 @@ export default function AddRestaurantPage() {
       image: undefined,
     },
   });
-
-  const selectedCuisineNames = form.watch('cuisine').map(id => {
-    const cuisine = allCuisines.find(c => c.id === id);
-    return cuisine ? cuisine.name : id;
-  }).join(', ');
-
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -272,36 +258,36 @@ export default function AddRestaurantPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cocina / Categorías</FormLabel>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <FormControl>
-                          <Button variant="outline" className="w-full justify-between">
-                            {selectedCuisineNames || "Seleccionar categorías"}
-                            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-full max-h-60 overflow-y-auto">
-                        <DropdownMenuLabel>Tipos de Cocina</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {allCuisines.map((cuisineItem) => (
-                          <DropdownMenuCheckboxItem
-                            key={cuisineItem.id}
-                            checked={field.value?.includes(cuisineItem.id)}
-                            onCheckedChange={(checked) => {
-                              const currentValue = field.value || [];
-                              if (checked) {
-                                field.onChange([...currentValue, cuisineItem.id]);
-                              } else {
-                                field.onChange(currentValue.filter((id) => id !== cuisineItem.id));
-                              }
-                            }}
-                          >
-                            {cuisineItem.name}
-                          </DropdownMenuCheckboxItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <FormControl>
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        {allCuisines.map((cuisineItem) => {
+                          const isSelected = field.value?.includes(cuisineItem.id);
+                          return (
+                            <Button
+                              key={cuisineItem.id}
+                              type="button"
+                              variant={isSelected ? "default" : "outline"}
+                              size="sm"
+                              className={`rounded-full px-3 py-1 h-auto text-sm transition-colors duration-150 ease-in-out
+                                          ${isSelected 
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                                            : 'bg-background text-foreground border-border hover:bg-accent hover:text-accent-foreground'
+                                          }`}
+                              onClick={() => {
+                                const currentValue = field.value || [];
+                                if (isSelected) {
+                                  field.onChange(currentValue.filter((id) => id !== cuisineItem.id));
+                                } else {
+                                  field.onChange([...currentValue, cuisineItem.id]);
+                                }
+                              }}
+                            >
+                              {cuisineItem.name}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -377,6 +363,7 @@ export default function AddRestaurantPage() {
                                 }}
                                 onChange={(e) => {
                                   handleImageFileChange(e);
+                                  imageField.onChange(e.target.files?.[0]); // ensure react-hook-form's onChange is called
                                 }}
                               />
                             </FormControl>
@@ -392,7 +379,7 @@ export default function AddRestaurantPage() {
                     <div className="mt-4">
                       <FormLabel>Vista Previa de la Imagen</FormLabel>
                       <div className="mt-2 relative w-full aspect-video rounded-md overflow-hidden border">
-                        <Image src={imagePreview} alt="Vista previa de la imagen" fill objectFit="cover" />
+                        <Image src={imagePreview} alt="Vista previa de la imagen" fill style={{ objectFit: 'cover' }} />
                       </div>
                     </div>
                   )}
@@ -416,3 +403,4 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
+
