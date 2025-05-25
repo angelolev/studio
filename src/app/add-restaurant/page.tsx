@@ -9,8 +9,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
-import type { LatLngExpression, LatLng } from 'leaflet'; // Keep type import for LatLng
-// Removed: import L from 'leaflet'; // Ensure no top-level L import
+import type { LatLngExpression, LatLng, Icon as LeafletIcon } from 'leaflet';
+// L will be imported dynamically
+// import L from 'leaflet';
 import dynamic from 'next/dynamic';
 
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Restaurant } from '@/types';
 import { addRestaurantToFirestore } from '@/lib/firestoreService';
 import { cuisines as allCuisines } from '@/data/cuisines';
-import { Loader2, Camera, UploadCloud, VideoOff, ArrowLeft, MapPin } from 'lucide-react';
+import { Loader2, Camera, UploadCloud, VideoOff, ArrowLeft, MapPin, LocateFixed } from 'lucide-react';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
@@ -35,7 +36,7 @@ const useMapEvents = dynamic(() => import('react-leaflet').then(mod => mod.useMa
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
-const DEFAULT_MAP_CENTER: LatLngExpression = [-12.046374, -77.042793];
+const DEFAULT_MAP_CENTER_LIMA: LatLngExpression = [-12.046374, -77.042793]; // Lima, Peru
 const DEFAULT_MAP_ZOOM = 13;
 
 const addRestaurantSchema = z.object({
@@ -57,11 +58,26 @@ const addRestaurantSchema = z.object({
 
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
 
-function LocationMarker({ onPositionChange }: { onPositionChange: (latlng: LatLng) => void }) {
-  const [position, setPosition] = useState<LatLng | null>(null);
-  const UseMapEvents = useMapEvents;
+interface LocationMarkerProps {
+  onPositionChange: (latlng: LatLng) => void;
+  initialPosition?: LatLng | null;
+  L: typeof import('leaflet'); // Pass L as a prop
+  DefaultIcon: typeof LeafletIcon.Default; // Pass DefaultIcon as prop
+}
 
-  if (!UseMapEvents) return null;
+function LocationMarker({ onPositionChange, initialPosition, L, DefaultIcon }: LocationMarkerProps) {
+  const [position, setPosition] = useState<LatLng | null>(initialPosition || null);
+  const UseMapEvents = useMapEvents; // useMapEvents is already dynamically imported
+
+  // Update position if initialPosition changes and no position is set yet
+  useEffect(() => {
+    if (initialPosition && !position) {
+      setPosition(initialPosition);
+    }
+  }, [initialPosition, position]);
+
+
+  if (!UseMapEvents || !L) return null; // Ensure L is available
 
   const map = UseMapEvents({
     click(e) {
@@ -71,15 +87,8 @@ function LocationMarker({ onPositionChange }: { onPositionChange: (latlng: LatLn
     },
   });
 
-  useEffect(() => {
-    if (!position && map) {
-      // const initialCenter = map.getCenter();
-    }
-  }, [map, position, onPositionChange]);
-
-  // Temporarily remove custom icon
   return position === null ? null : (
-    <Marker position={position}>
+    <Marker position={position} icon={new DefaultIcon({ imagePath: '/_next/static/media/' })}>
       <Popup>Has seleccionado esta ubicación</Popup>
     </Marker>
   );
@@ -93,6 +102,9 @@ export default function AddRestaurantPage() {
   const queryClient = useQueryClient();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(DEFAULT_MAP_CENTER_LIMA);
+  const mapRef = useRef<import('leaflet').Map | null>(null);
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -101,11 +113,10 @@ export default function AddRestaurantPage() {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
-  const [selectedMapPosition, setSelectedMapPosition] = useState<LatLngExpression | null>(null);
+  const [selectedMapPosition, setSelectedMapPosition] = useState<LatLng | null>(null);
 
-  // Temporarily remove L and ActualDefaultIcon state and effect
-  // const [L, setL] = useState<typeof import('leaflet') | null>(null);
-  // const [ActualDefaultIcon, setActualDefaultIcon] = useState<LeafletIcon | null>(null);
+  const [L, setL] = useState<typeof import('leaflet') | null>(null);
+  const [ActualDefaultIcon, setActualDefaultIcon] = useState<typeof LeafletIcon.Default | null>(null);
 
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
@@ -120,19 +131,40 @@ export default function AddRestaurantPage() {
    useEffect(() => {
     if (typeof window !== 'undefined') {
       setMapReady(true);
-      // Temporarily remove L and ActualDefaultIcon setup
-      // import('leaflet').then(leafletModule => {
-      //   setL(leafletModule);
-      //   const icon = leafletModule.icon({
-      //     iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-      //     shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      //     iconSize: [25, 41],
-      //     iconAnchor: [12, 41],
-      //     popupAnchor: [1, -34],
-      //     shadowSize: [41, 41]
-      //   });
-      //   setActualDefaultIcon(icon);
-      // });
+      import('leaflet').then(leafletModule => {
+        setL(leafletModule);
+        // Correctly configure the default icon path for Next.js/Webpack
+        const icon = new leafletModule.Icon.Default({
+          imagePath: '/_next/static/media/' // Adjust if your marker images are elsewhere
+        });
+        setActualDefaultIcon(() => leafletModule.Icon.Default);
+         // Try to get user's current location
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const userLatLng: LatLngExpression = [position.coords.latitude, position.coords.longitude];
+              if (!form.getValues('latitude') && !form.getValues('longitude')) { // Only set if not already set by user click
+                 setCurrentMapCenter(userLatLng);
+                 if (mapRef.current) {
+                    mapRef.current.flyTo(userLatLng, DEFAULT_MAP_ZOOM + 2); // Zoom in a bit more
+                 }
+              }
+            },
+            (error) => {
+              console.warn(`Error obteniendo geolocalización: ${error.message}`);
+              // Falls back to DEFAULT_MAP_CENTER_LIMA if error or no pre-selected point
+              if (!form.getValues('latitude') && !form.getValues('longitude')) {
+                setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
+              }
+            },
+            { timeout: 10000 }
+          );
+        } else {
+           if (!form.getValues('latitude') && !form.getValues('longitude')) {
+             setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
+           }
+        }
+      });
     }
   }, []);
 
@@ -237,6 +269,8 @@ export default function AddRestaurantPage() {
       form.reset();
       setImagePreview(null);
       setSelectedMapPosition(null);
+      setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA); // Reset map center
+      if (mapRef.current) mapRef.current.setView(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
       router.push('/');
     },
     onError: (error) => {
@@ -288,6 +322,41 @@ export default function AddRestaurantPage() {
     setIsTakingPhoto(false);
   };
 
+  const centerMapOnUser = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userLatLng: LatLngExpression = [position.coords.latitude, position.coords.longitude];
+          setCurrentMapCenter(userLatLng);
+          if (mapRef.current) {
+            mapRef.current.flyTo(userLatLng, DEFAULT_MAP_ZOOM + 2);
+          }
+          // Optionally, set the marker position if no marker is selected yet
+          // if (!selectedMapPosition) {
+          //   setSelectedMapPosition(new (L as any).LatLng(position.coords.latitude, position.coords.longitude));
+          //   form.setValue('latitude', position.coords.latitude, { shouldValidate: true });
+          //   form.setValue('longitude', position.coords.longitude, { shouldValidate: true });
+          // }
+        },
+        (error) => {
+          toast({
+            title: "Error de Geolocalización",
+            description: "No se pudo obtener tu ubicación actual. " + error.message,
+            variant: "destructive",
+          });
+        },
+        { timeout: 10000 }
+      );
+    } else {
+      toast({
+        title: "Geolocalización no Soportada",
+        description: "Tu navegador no soporta geolocalización.",
+        variant: "destructive",
+      });
+    }
+  };
+
+
   if (loadingAuthState) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
@@ -306,6 +375,9 @@ export default function AddRestaurantPage() {
       </div>
     );
   }
+
+  const displayCenter = selectedMapPosition ? [selectedMapPosition.lat, selectedMapPosition.lng] : currentMapCenter;
+
 
   return (
     <div className="max-w-2xl mx-auto py-8">
@@ -383,28 +455,38 @@ export default function AddRestaurantPage() {
 
               <FormField
                 control={form.control}
-                name="latitude"
-                render={({ field }) => (
+                name="latitude" // Keep one for error display for the map selection
+                render={({ fieldState: latitudeFieldState }) => ( // Only use fieldState for errors
                   <FormItem>
-                    <FormLabel>Ubicación en el Mapa</FormLabel>
+                    <div className="flex justify-between items-center">
+                        <FormLabel>Ubicación en el Mapa</FormLabel>
+                        <Button type="button" variant="outline" size="sm" onClick={centerMapOnUser} className="gap-1.5">
+                            <LocateFixed size={16}/>
+                            Usar mi ubicación
+                        </Button>
+                    </div>
                      <FormDescription>
                        Haz clic en el mapa para seleccionar la ubicación del restaurante.
                      </FormDescription>
-                    {mapReady ? ( // Simplified condition, relying on dynamic import for react-leaflet components
+                    {(mapReady && L && ActualDefaultIcon) ? (
                       <MapContainer
-                        center={selectedMapPosition || DEFAULT_MAP_CENTER}
+                        center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
                         scrollWheelZoom={true}
                         style={{ height: '300px', width: '100%', borderRadius: 'var(--radius)' }}
                         className="z-0"
+                        whenCreated={mapInstance => { mapRef.current = mapInstance; }}
                       >
                         <TileLayer
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
                         <LocationMarker
+                          L={L}
+                          DefaultIcon={ActualDefaultIcon}
+                          initialPosition={selectedMapPosition}
                           onPositionChange={(latlng) => {
-                            setSelectedMapPosition([latlng.lat, latlng.lng]);
+                            setSelectedMapPosition(latlng);
                             form.setValue('latitude', latlng.lat, { shouldValidate: true });
                             form.setValue('longitude', latlng.lng, { shouldValidate: true });
                           }}
@@ -416,7 +498,11 @@ export default function AddRestaurantPage() {
                         <p className="ml-2">Cargando mapa...</p>
                       </div>
                     )}
-                    <FormMessage />
+                     {latitudeFieldState.error && <FormMessage>{latitudeFieldState.error.message}</FormMessage>}
+                     {/* Also check longitude error if you want separate messages, or rely on latitude */}
+                     {form.formState.errors.longitude && !latitudeFieldState.error && (
+                        <FormMessage>{form.formState.errors.longitude.message}</FormMessage>
+                     )}
                   </FormItem>
                 )}
               />
@@ -466,7 +552,7 @@ export default function AddRestaurantPage() {
                   <FormField
                     control={form.control}
                     name="image"
-                    render={({ field: imageField }) => (
+                    render={({ field: imageField }) => ( // Destructure field to avoid name clash
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -486,13 +572,17 @@ export default function AddRestaurantPage() {
                                 type="file"
                                 className="sr-only"
                                 accept={ACCEPTED_IMAGE_TYPES.join(',')}
-                                ref={(instance) => {
+                                ref={(instance) => { // Correct ref assignment
                                   fileUploadInputRef.current = instance;
-                                  imageField.ref(instance);
+                                  if (typeof imageField.ref === 'function') {
+                                    imageField.ref(instance);
+                                  }
                                 }}
                                 onChange={(e) => {
                                   handleImageFileChange(e);
-                                  imageField.onChange(e.target.files?.[0]);
+                                  if (typeof imageField.onChange === 'function') {
+                                    imageField.onChange(e.target.files?.[0]);
+                                  }
                                 }}
                               />
                             </FormControl>
@@ -532,5 +622,3 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
-
-    
