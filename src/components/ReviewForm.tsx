@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useRef } from "react"; // Import useRef
+import { useRef } from "react"; 
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   addReviewToFirestore,
   type AddedReviewPlain,
+  type ReviewFirestoreData, // Ensure ReviewFirestoreData is imported if used locally
 } from "@/lib/firestoreService";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -48,7 +49,7 @@ export default function ReviewForm({
   const { user, loadingAuthState } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const localTextareaRef = useRef<HTMLTextAreaElement>(null); // Ref for the textarea
+  const localTextareaRef = useRef<HTMLTextAreaElement>(null); 
 
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewSchema),
@@ -167,21 +168,19 @@ export default function ReviewForm({
                   placeholder="Cuéntanos sobre tu experiencia..."
                   {...field}
                   ref={(e) => {
-                    // Merge react-hook-form's ref with our local ref
                     field.ref(e);
                     localTextareaRef.current = e;
                   }}
                   onFocus={() => {
-                    // Scroll into view on focus, with a delay for keyboard animation
                     setTimeout(() => {
                       localTextareaRef.current?.scrollIntoView({
                         behavior: "smooth",
                         block: "center",
                       });
-                    }, 150); // Adjust delay as needed
+                    }, 150); 
                   }}
                   rows={4}
-                  className="bg-card"
+                  className="bg-card focus-visible:border-primary"
                 />
               </FormControl>
               <FormMessage />
@@ -206,4 +205,3 @@ export default function ReviewForm({
     </Form>
   );
 }
-

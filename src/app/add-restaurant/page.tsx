@@ -3,7 +3,8 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, SubmitHandler, Controller } from 'react-hook-form';
+import Link from 'next/link'; // Import Link
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Restaurant } from '@/types';
 import { addRestaurantToFirestore } from '@/lib/firestoreService';
 import { cuisines as allCuisines } from '@/data/cuisines';
-import { Loader2, Camera, UploadCloud, Video, VideoOff } from 'lucide-react';
+import { Loader2, Camera, UploadCloud, VideoOff, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -50,7 +51,7 @@ export default function AddRestaurantPage() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileUploadInputRef = useRef<HTMLInputElement>(null);
+  const fileUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -155,7 +156,7 @@ export default function AddRestaurantPage() {
   }, [stream, isCameraOpen]);
 
   const mutation = useMutation({
-    mutationFn: (data: { restaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>, imageFile?: File }) =>
+    mutationFn: (data: { restaurantData: Pick<Restaurant, 'name' | 'cuisine' | 'address'>, imageFile?: File }) =>
       addRestaurantToFirestore(data.restaurantData, data.imageFile),
     onSuccess: (data) => {
       toast({
@@ -229,6 +230,14 @@ export default function AddRestaurantPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8">
+      <div className="mb-6">
+        <Link href="/" passHref legacyBehavior>
+          <Button variant="outline" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver a la Página Principal
+          </Button>
+        </Link>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Agregar un Nuevo Restaurante</CardTitle>
@@ -363,7 +372,7 @@ export default function AddRestaurantPage() {
                                 }}
                                 onChange={(e) => {
                                   handleImageFileChange(e);
-                                  imageField.onChange(e.target.files?.[0]); // ensure react-hook-form's onChange is called
+                                  imageField.onChange(e.target.files?.[0]); 
                                 }}
                               />
                             </FormControl>
@@ -403,4 +412,3 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
-
