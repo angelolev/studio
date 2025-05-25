@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react"; // Added useRef
 import Image from "next/image";
 import type { Restaurant } from "@/types";
 import type { Review as AppReviewType } from "@/types";
@@ -31,7 +31,7 @@ import { Loader2, MapPin } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
-import type { LatLngExpression, LatLng, Icon as LeafletIconType, Map as LeafletMap } from 'leaflet';
+import type { LatLngExpression, Icon as LeafletIconType, Map as LeafletMap } from 'leaflet';
 import dynamic from 'next/dynamic';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
@@ -66,7 +66,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     staleTime: 5 * 60 * 1000,
-    enabled: true,
+    enabled: true, // Fetch reviews when card mounts
     select: (data) =>
       data.map((review) => ({
         ...review,
@@ -88,7 +88,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     if (isDialogOpen && typeof window !== 'undefined') {
       import('leaflet').then(leafletModule => {
         setL(leafletModule);
-        setActualDefaultIcon(() => leafletModule.Icon.Default);
+        // Correctly configure the default icon path for Next.js/Webpack
+        const DefaultIconClass = leafletModule.Icon.Default;
+        DefaultIconClass.prototype.options.imagePath = '/_next/static/media/'; // Adjusted path
+        setActualDefaultIcon(() => DefaultIconClass);
         setMapReadyDialog(true);
       }).catch(error => console.error("Failed to load Leaflet for dialog map:", error));
     } else if (!isDialogOpen) {
@@ -151,16 +154,15 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       if (firstCuisineId) {
         const cuisineForHint = allCuisines.find(c => c.id === firstCuisineId);
         if (cuisineForHint && cuisineForHint.name) {
-          // Use first word of cuisine name as hint, or a default if too short/generic
           const words = cuisineForHint.name.split(" ");
           if (words.length > 0 && words[0].length > 2) {
             return words[0].toLowerCase();
           }
         }
       }
-      return "logo restaurante"; // Default placeholder hint
+      return "restaurante logo";
     }
-    return undefined; // No hint for user-uploaded images
+    return undefined;
   }, [restaurant.imageUrl, restaurant.cuisine]);
 
 
