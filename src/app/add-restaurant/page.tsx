@@ -22,7 +22,7 @@ import { Loader2 } from 'lucide-react';
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, { message: 'El nombre del restaurante debe tener al menos 2 caracteres.' }),
-  cuisine: z.string().min(1, { message: 'Por favor, selecciona una cocina/categoría.' }),
+  cuisine: z.string().min(1, { message: 'Por favor, selecciona una categoría.' }),
   address: z.string().min(5, { message: 'La dirección debe tener al menos 5 caracteres.' }),
 });
 
@@ -132,7 +132,7 @@ export default function AddRestaurantPage() {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={"Selecciona una cocina"} />
+                          <SelectValue placeholder={"Selecciona una categoría"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react"; // Import useRef
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -47,6 +48,7 @@ export default function ReviewForm({
   const { user, loadingAuthState } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const localTextareaRef = useRef<HTMLTextAreaElement>(null); // Ref for the textarea
 
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewSchema),
@@ -164,6 +166,20 @@ export default function ReviewForm({
                 <Textarea
                   placeholder="Cuéntanos sobre tu experiencia..."
                   {...field}
+                  ref={(e) => {
+                    // Merge react-hook-form's ref with our local ref
+                    field.ref(e);
+                    localTextareaRef.current = e;
+                  }}
+                  onFocus={() => {
+                    // Scroll into view on focus, with a delay for keyboard animation
+                    setTimeout(() => {
+                      localTextareaRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      });
+                    }, 150); // Adjust delay as needed
+                  }}
                   rows={4}
                   className="bg-card"
                 />
@@ -190,3 +206,4 @@ export default function ReviewForm({
     </Form>
   );
 }
+
