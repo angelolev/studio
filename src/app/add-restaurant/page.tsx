@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,14 +14,15 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Restaurant } from '@/types';
 import { addRestaurantToFirestore } from '@/lib/firestoreService';
 import { cuisines } from '@/data/cuisines';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Camera, UploadCloud, Video, VideoOff } from 'lucide-react';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB - Recommended to keep for uploads
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 const addRestaurantSchema = z.object({
@@ -29,14 +30,13 @@ const addRestaurantSchema = z.object({
   cuisine: z.string().min(1, { message: 'Por favor, selecciona una categoría.' }),
   address: z.string().min(5, { message: 'La dirección debe tener al menos 5 caracteres.' }),
   image: z
-    .custom<FileList>()
-    .refine((files) => files && files.length > 0, "Se requiere una imagen.")
-    .refine((files) => files && files[0]?.size <= MAX_FILE_SIZE, `El tamaño máximo del archivo es 5MB.`)
+    .custom<File>() // Using File directly now
+    .refine((file) => file?.size <= MAX_FILE_SIZE, `El tamaño máximo del archivo es 5MB.`)
     .refine(
-      (files) => files && ACCEPTED_IMAGE_TYPES.includes(files[0]?.type),
+      (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type || ""),
       "Solo se aceptan formatos .jpg, .jpeg, .png y .webp."
     )
-    .optional(), // Make it optional for now, or remove .optional() to require it
+    .optional(), // Optional because user might not upload/capture one
 });
 
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
@@ -48,12 +48,21 @@ export default function AddRestaurantPage() {
   const queryClient = useQueryClient();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+
+
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
     defaultValues: {
       name: '',
       cuisine: '',
       address: '',
+      image: undefined,
     },
   });
 
@@ -67,6 +76,88 @@ export default function AddRestaurantPage() {
       router.replace('/');
     }
   }, [user, loadingAuthState, router, toast]);
+
+  // Camera permission logic
+  const getCameraPermission = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast({
+        variant: 'destructive',
+        title: 'Cámara no Soportada',
+        description: 'Tu navegador no soporta acceso a la cámara.',
+      });
+      setHasCameraPermission(false);
+      setIsCameraOpen(false);
+      return;
+    }
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setStream(mediaStream);
+      setHasCameraPermission(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setHasCameraPermission(false);
+      setIsCameraOpen(false);
+      toast({
+        variant: 'destructive',
+        title: 'Acceso a Cámara Denegado',
+        description: 'Por favor, habilita los permisos de cámara en tu navegador.',
+      });
+    }
+  };
+
+  const openCamera = async () => {
+    setIsTakingPhoto(true); // Show camera UI elements
+    setIsCameraOpen(true);
+    if (hasCameraPermission === null || hasCameraPermission === false) {
+      await getCameraPermission();
+    } else if (hasCameraPermission === true && stream && videoRef.current) {
+       videoRef.current.srcObject = stream; // Re-assign if already have stream
+    }
+  };
+
+  const closeCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    setIsCameraOpen(false);
+    setStream(null);
+    // Don't set isTakingPhoto to false here if we want to keep showing the preview
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], `restaurant-capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            form.setValue('image', file, { shouldValidate: true });
+            setImagePreview(URL.createObjectURL(file));
+          }
+        }, 'image/jpeg');
+      }
+      closeCamera();
+      setIsTakingPhoto(false); // Now hide camera UI
+    }
+  };
+
+  useEffect(() => {
+    // Cleanup stream on component unmount or when camera is closed
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
+
 
   const mutation = useMutation({
     mutationFn: (data: { restaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>, imageFile?: File }) =>
@@ -93,23 +184,24 @@ export default function AddRestaurantPage() {
   const onSubmit: SubmitHandler<AddRestaurantFormData> = (data) => {
     if (!user) return;
     const { image, ...restaurantData } = data;
-    const imageFile = image && image.length > 0 ? image[0] : undefined;
+    const imageFile = image instanceof File ? image : undefined;
     mutation.mutate({ restaurantData, imageFile });
   };
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      form.setValue('image', file, { shouldValidate: true });
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-      form.setValue("image", event.target.files as FileList); // Set value for react-hook-form
     } else {
+      form.setValue('image', undefined);
       setImagePreview(null);
-      form.setValue("image", undefined);
     }
+    setIsTakingPhoto(false); // If user uploads, ensure camera UI is hidden
   };
 
 
@@ -123,8 +215,6 @@ export default function AddRestaurantPage() {
   }
 
   if (!user) {
-    // This case should ideally be handled by the useEffect redirect,
-    // but as a fallback:
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-lg text-destructive">Acceso Denegado.</p>
@@ -200,40 +290,79 @@ export default function AddRestaurantPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="image"
-                render={({ field: { onChange, value, ...rest } }) => ( // Destructure field correctly
-                  <FormItem>
-                    <FormLabel>Imagen del Restaurante</FormLabel>
-                    <FormControl>
-                       <Input
-                        type="file"
-                        accept="image/png, image/jpeg, image/jpg, image/webp"
-                        onChange={(e) => {
-                           handleImageChange(e); // Use our custom handler
-                        }}
-                        className="file:text-primary file:font-semibold file:bg-primary/10 hover:file:bg-primary/20"
-                        {...rest} // Pass rest of props
-                      />
-                    </FormControl>
-                     <FormDescription>
-                      Sube una imagen para tu restaurante (JPG, PNG, WebP, max 5MB).
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {imagePreview && (
-                <div className="mt-4">
-                  <FormLabel>Vista Previa de la Imagen</FormLabel>
-                  <div className="mt-2 relative w-full aspect-video rounded-md overflow-hidden border">
-                    <Image src={imagePreview} alt="Vista previa de la imagen" layout="fill" objectFit="cover" />
-                  </div>
-                </div>
+
+              {isTakingPhoto && isCameraOpen ? (
+                 <div className="space-y-4">
+                   <div className="relative w-full aspect-video bg-muted rounded-md overflow-hidden border">
+                      <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                      {hasCameraPermission === false && (
+                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
+                            <Alert variant="destructive">
+                                <VideoOff className="h-5 w-5" />
+                                <AlertTitle>Acceso a Cámara Denegado</AlertTitle>
+                                <AlertDescription>
+                                Revisa los permisos de cámara de tu navegador.
+                                </AlertDescription>
+                            </Alert>
+                         </div>
+                      )}
+                   </div>
+                   <canvas ref={canvasRef} className="hidden"></canvas>
+                   <div className="flex gap-2">
+                    <Button type="button" onClick={capturePhoto} className="w-full" disabled={hasCameraPermission === false}>
+                        <Camera className="mr-2 h-4 w-4" /> Capturar Foto
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => { closeCamera(); setIsTakingPhoto(false);}} className="w-full">
+                        Cancelar
+                    </Button>
+                   </div>
+                 </div>
+              ) : (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="image"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Imagen del Restaurante</FormLabel>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                           <Button type="button" onClick={openCamera} variant="outline" className="flex-1">
+                             <Camera className="mr-2" /> Tomar Foto
+                           </Button>
+                           <FormControl>
+                             <Button asChild variant="outline" className="flex-1 cursor-pointer">
+                               <div>
+                                 <UploadCloud className="mr-2" /> Subir Imagen
+                                 <Input
+                                  type="file"
+                                  className="sr-only" // Hidden but accessible
+                                  accept="image/png, image/jpeg, image/jpg, image/webp"
+                                  onChange={handleImageFileChange}
+                                  // {...field} but onChange is handled
+                                />
+                               </div>
+                             </Button>
+                           </FormControl>
+                        </div>
+                        <FormDescription>
+                          Toma una foto o sube una imagen (JPG, PNG, WebP, max 5MB).
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {imagePreview && (
+                    <div className="mt-4">
+                      <FormLabel>Vista Previa de la Imagen</FormLabel>
+                      <div className="mt-2 relative w-full aspect-video rounded-md overflow-hidden border">
+                        <Image src={imagePreview} alt="Vista previa de la imagen" layout="fill" objectFit="cover" />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              <Button type="submit" className="w-full" disabled={mutation.isPending}>
+              <Button type="submit" className="w-full" disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}>
                 {mutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
