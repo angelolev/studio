@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'dynamic-media-cdn.tripadvisor.com',
+        hostname: 'firebasestorage.googleapis.com',
         port: '',
         pathname: '/**',
       }
