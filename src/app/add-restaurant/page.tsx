@@ -12,6 +12,11 @@ import Image from 'next/image';
 import type { LatLngExpression, LatLng, Icon as LeafletIconType, Map as LeafletMap } from 'leaflet';
 import dynamic from 'next/dynamic';
 
+// Import Leaflet marker images
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,10 +31,9 @@ import { Loader2, Camera, UploadCloud, VideoOff, ArrowLeft, MapPin, LocateFixed 
 
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
-// We'll load Marker and Popup dynamically and pass them to LocationMarker
 const BaseMarker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
 const BasePopup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
-const useMapEvents = dynamic(() => import('react-leaflet').then(mod => mod.useMapEvents), { ssr: false });
+const BaseUseMapEvents = dynamic(() => import('react-leaflet').then(mod => mod.useMapEvents), { ssr: false });
 
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -62,35 +66,31 @@ interface LocationMarkerProps {
   initialPosition?: LatLng | null;
   L: typeof import('leaflet') | null;
   DefaultIcon: typeof LeafletIconType.Default | null;
-  MarkerComponent: typeof BaseMarker | null; 
-  PopupComponent: typeof BasePopup | null;   
-  UseMapEventsHook: typeof useMapEvents | null;
+  MarkerComponent: typeof BaseMarker | null;
+  PopupComponent: typeof BasePopup | null;
+  UseMapEventsHook: typeof BaseUseMapEvents | null;
 }
 
-// Define LocationMarker outside of AddRestaurantPage
-function LocationMarker({ 
-  onPositionChange, 
-  initialPosition, 
-  L, 
+function LocationMarker({
+  onPositionChange,
+  initialPosition,
+  L,
   DefaultIcon,
   MarkerComponent,
   PopupComponent,
   UseMapEventsHook
 }: LocationMarkerProps) {
   const [markerPosition, setMarkerPosition] = useState<LatLng | null>(initialPosition || null);
-  
-  // This hook MUST be called unconditionally at the top level.
-  // It will only be truly active if UseMapEventsHook is not null (i.e., loaded)
+
   const map = UseMapEventsHook ? UseMapEventsHook({
     click(e) {
-      if (L && DefaultIcon && MarkerComponent && PopupComponent) { 
+      if (L && DefaultIcon && MarkerComponent && PopupComponent) {
         const newPosition = e.latlng;
         setMarkerPosition(newPosition);
         onPositionChange(newPosition);
       }
     },
   }) : null;
-
 
   useEffect(() => {
     setMarkerPosition(initialPosition || null);
@@ -99,7 +99,8 @@ function LocationMarker({
   if (!L || !DefaultIcon || !markerPosition || !MarkerComponent || !PopupComponent || !map) {
     return null;
   }
-  
+
+  // DefaultIcon is a class constructor, so we instantiate it.
   const iconInstance = new DefaultIcon();
 
   return (
@@ -116,7 +117,7 @@ export default function AddRestaurantPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  
+
   const [mapReady, setMapReady] = useState(false);
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(DEFAULT_MAP_CENTER_LIMA);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -132,11 +133,9 @@ export default function AddRestaurantPage() {
 
   const [L, setL] = useState<typeof import('leaflet') | null>(null);
   const [ActualDefaultIcon, setActualDefaultIcon] = useState<typeof LeafletIconType.Default | null>(null);
-  
-  const [MarkerForLocation, setMarkerForLocation] = useState<typeof BaseMarker | null>(null);
-  const [PopupForLocation, setPopupForLocation] = useState<typeof BasePopup | null>(null);
-  const [UseMapEventsForLocation, setUseMapEventsForLocation] = useState<typeof useMapEvents | null>(null);
-
+  const [ActualMarker, setActualMarker] = useState<typeof BaseMarker | null>(null);
+  const [ActualPopup, setActualPopup] = useState<typeof BasePopup | null>(null);
+  const [ActualUseMapEvents, setActualUseMapEvents] = useState<typeof BaseUseMapEvents | null>(null);
 
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
@@ -156,24 +155,28 @@ export default function AddRestaurantPage() {
       import('react-leaflet').then(mod => mod.useMapEvents),
     ]).then(([leafletModule, MarkerComp, PopupComp, UseMapEventsComp]) => {
       setL(leafletModule);
-      // Types for react-leaflet components loaded via dynamic import can be tricky.
-      // Casting to any temporarily if direct type assertion fails, then to the target.
-      setMarkerForLocation(() => MarkerComp as any as typeof BaseMarker);
-      setPopupForLocation(() => PopupComp as any as typeof BasePopup);
-      setUseMapEventsForLocation(() => UseMapEventsComp as any as typeof useMapEvents);
-      
-      const IconDefault = leafletModule.Icon.Default;
-      if (!IconDefault.prototype.options.imagePath) { // Ensure this runs only once
-        IconDefault.prototype.options.imagePath = '/_next/static/media/';
+
+      // Configure Leaflet's default icon
+      if (leafletModule && !leafletModule.Icon.Default.prototype._iconInit) {
+        leafletModule.Icon.Default.mergeOptions({
+          iconRetinaUrl: markerIcon2x.src,
+          iconUrl: markerIcon.src,
+          shadowUrl: markerShadow.src,
+        });
+        leafletModule.Icon.Default.prototype._iconInit = true; // Prevent re-initialization
       }
-      setActualDefaultIcon(() => IconDefault);
+
+      setActualDefaultIcon(() => leafletModule ? leafletModule.Icon.Default : null);
+      setActualMarker(() => MarkerComp as any as typeof BaseMarker);
+      setActualPopup(() => PopupComp as any as typeof BasePopup);
+      setActualUseMapEvents(() => UseMapEventsComp as any as typeof BaseUseMapEvents);
       setMapReady(true);
     }).catch(error => {
       console.error("Failed to load Leaflet or react-leaflet components:", error);
       toast({ title: "Error", description: "No se pudo cargar el módulo del mapa.", variant: "destructive" });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array to run once on mount
+  }, []);
 
   const latitudeValue = form.watch('latitude');
   const longitudeValue = form.watch('longitude');
@@ -196,7 +199,8 @@ export default function AddRestaurantPage() {
         );
       }
     }
-  }, [mapReady, latitudeValue, longitudeValue]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady]); // Removed latitudeValue and longitudeValue to prevent re-running if user selects a point
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -489,7 +493,7 @@ export default function AddRestaurantPage() {
                      <FormDescription>
                        Haz clic en el mapa para seleccionar la ubicación del restaurante.
                      </FormDescription>
-                    {(mapReady && L && ActualDefaultIcon && MapContainer && TileLayer && MarkerForLocation && PopupForLocation && UseMapEventsForLocation) ? (
+                    {(mapReady && L && ActualDefaultIcon && MapContainer && TileLayer && ActualMarker && ActualPopup && ActualUseMapEvents) ? (
                       <MapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
@@ -504,9 +508,9 @@ export default function AddRestaurantPage() {
                         <LocationMarker
                           L={L}
                           DefaultIcon={ActualDefaultIcon}
-                          MarkerComponent={MarkerForLocation}
-                          PopupComponent={PopupForLocation}
-                          UseMapEventsHook={UseMapEventsForLocation}
+                          MarkerComponent={ActualMarker}
+                          PopupComponent={ActualPopup}
+                          UseMapEventsHook={ActualUseMapEvents}
                           initialPosition={selectedMapPosition}
                           onPositionChange={(latlng) => {
                             setSelectedMapPosition(latlng);
@@ -574,7 +578,7 @@ export default function AddRestaurantPage() {
                   <FormField
                     control={form.control}
                     name="image"
-                    render={({ field: imageField }) => (
+                    render={({ field: imageField }) => ( // Renamed field to imageField to avoid conflict
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -606,6 +610,8 @@ export default function AddRestaurantPage() {
                                     imageField.onChange(e.target.files?.[0]);
                                   }
                                 }}
+                               onBlur={imageField.onBlur} // Added onBlur
+                               name={imageField.name} // Added name
                               />
                             </FormControl>
                         </div>
