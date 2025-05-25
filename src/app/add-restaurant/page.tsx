@@ -30,7 +30,8 @@ const addRestaurantSchema = z.object({
   cuisine: z.string().min(1, { message: 'Por favor, selecciona una categoría.' }),
   address: z.string().min(5, { message: 'La dirección debe tener al menos 5 caracteres.' }),
   image: z
-    .custom<File>() 
+    .custom<File>()
+    .refine((file) => !!file, "Se requiere una imagen.") // Ensure image is present
     .refine((file) => file?.size <= MAX_FILE_SIZE, `El tamaño máximo del archivo es 5MB.`)
     .refine(
       (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type || ""),
@@ -50,7 +51,7 @@ export default function AddRestaurantPage() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileUploadInputRef = useRef<HTMLInputElement>(null); // Ref for the file input
+  const fileUploadInputRef = useRef<HTMLInputElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -90,7 +91,7 @@ export default function AddRestaurantPage() {
       return;
     }
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       setStream(mediaStream);
       setHasCameraPermission(true);
       if (videoRef.current) {
@@ -103,18 +104,18 @@ export default function AddRestaurantPage() {
       toast({
         variant: 'destructive',
         title: 'Acceso a Cámara Denegado',
-        description: 'Por favor, habilita los permisos de cámara en tu navegador.',
+        description: 'Por favor, habilita los permisos de cámara en tu navegador o la cámara seleccionada no está disponible.',
       });
     }
   };
 
   const openCamera = async () => {
-    setIsTakingPhoto(true); 
+    setIsTakingPhoto(true);
     setIsCameraOpen(true);
     if (hasCameraPermission === null || hasCameraPermission === false) {
       await getCameraPermission();
     } else if (hasCameraPermission === true && stream && videoRef.current) {
-       videoRef.current.srcObject = stream; 
+       videoRef.current.srcObject = stream;
     }
   };
 
@@ -123,7 +124,8 @@ export default function AddRestaurantPage() {
       stream.getTracks().forEach(track => track.stop());
     }
     setIsCameraOpen(false);
-    setStream(null);
+    // Do not set stream to null here, as it might be reused if permission was already granted
+    // setStream(null);
   };
 
   const capturePhoto = () => {
@@ -144,17 +146,18 @@ export default function AddRestaurantPage() {
         }, 'image/jpeg');
       }
       closeCamera();
-      setIsTakingPhoto(false); 
+      setIsTakingPhoto(false);
     }
   };
 
   useEffect(() => {
+    // Cleanup stream when component unmounts or if stream changes and is no longer needed
     return () => {
-      if (stream) {
+      if (stream && !isCameraOpen) { // Only stop if camera isn't actively open
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [stream]);
+  }, [stream, isCameraOpen]);
 
 
   const mutation = useMutation({
@@ -182,7 +185,19 @@ export default function AddRestaurantPage() {
   const onSubmit: SubmitHandler<AddRestaurantFormData> = (data) => {
     if (!user) return;
     const { image, ...restaurantData } = data;
+    
+    // Check if image is defined and is a File object
     const imageFile = image instanceof File ? image : undefined;
+    
+    if (!imageFile && !imagePreview) { // If no file and no preview (e.g. from camera)
+        toast({
+            title: "Imagen Requerida",
+            description: "Por favor, toma una foto o sube una imagen para el restaurante.",
+            variant: "destructive",
+        });
+        return;
+    }
+
     mutation.mutate({ restaurantData, imageFile });
   };
 
@@ -199,7 +214,7 @@ export default function AddRestaurantPage() {
       form.setValue('image', undefined);
       setImagePreview(null);
     }
-    setIsTakingPhoto(false); 
+    setIsTakingPhoto(false);
   };
 
 
@@ -320,7 +335,7 @@ export default function AddRestaurantPage() {
                   <FormField
                     control={form.control}
                     name="image"
-                    render={({ field: imageField }) => ( // Renamed field to imageField for clarity
+                    render={({ field: imageField }) => (
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -339,17 +354,14 @@ export default function AddRestaurantPage() {
                               <Input
                                 type="file"
                                 className="sr-only"
-                                accept="image/png, image/jpeg, image/jpg, image/webp"
+                                accept={ACCEPTED_IMAGE_TYPES.join(',')}
                                 ref={(instance) => {
                                   fileUploadInputRef.current = instance;
-                                  imageField.ref(instance); // Connect RHF's ref
+                                  imageField.ref(instance);
                                 }}
                                 onChange={(e) => {
                                   handleImageFileChange(e);
-                                  // imageField.onChange(e.target.files?.[0]); // RHF can also track like this
                                 }}
-                                // name={imageField.name} // Not needed as Controller handles it
-                                // onBlur={imageField.onBlur} // Not needed as Controller handles it
                               />
                             </FormControl>
                         </div>
@@ -388,3 +400,5 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
+
+    
