@@ -110,15 +110,17 @@ export async function checkIfUserReviewed(
 
 export interface RestaurantFirestoreData {
   name: string;
-  cuisine: string[]; // Changed from string to string[]
-  address: string;
+  cuisine: string[];
+  address?: string; // Made optional
+  latitude: number;
+  longitude: number;
   imageUrl: string;
   description: string;
   createdAt: Timestamp | ReturnType<typeof serverTimestamp>;
 }
 
 export async function addRestaurantToFirestore(
-  restaurantData: Pick<AppRestaurantType, 'name' | 'cuisine' | 'address'>,
+  restaurantData: Omit<AppRestaurantType, 'id' | 'imageUrl' | 'description'>, // imageUrl and description will be generated
   imageFile?: File
 ): Promise<AppRestaurantType> {
   const restaurantColRef = collection(db, "restaurants");
@@ -141,12 +143,15 @@ export async function addRestaurantToFirestore(
     return foundCuisine ? foundCuisine.name : cId;
   }).join(' y ');
 
-  const description = `Un restaurante especializado en ${cuisineNames}, ubicado en ${restaurantData.address}.`;
+  const description = `Un restaurante especializado en ${cuisineNames}${restaurantData.address ? `, ubicado cerca de ${restaurantData.address}` : ''}. Encuéntralo en el mapa.`;
+
 
   const docData: RestaurantFirestoreData = {
     name: restaurantData.name,
-    cuisine: restaurantData.cuisine, // Now an array
+    cuisine: restaurantData.cuisine,
     address: restaurantData.address,
+    latitude: restaurantData.latitude,
+    longitude: restaurantData.longitude,
     imageUrl: imageUrl,
     description: description,
     createdAt: serverTimestamp(),
@@ -156,9 +161,7 @@ export async function addRestaurantToFirestore(
 
   return {
     id: docRef.id,
-    name: restaurantData.name,
-    cuisine: restaurantData.cuisine, // Returns the array
-    address: restaurantData.address,
+    ...restaurantData, // Spreads name, cuisine, address (if present), latitude, longitude
     imageUrl: docData.imageUrl,
     description: docData.description,
   };
@@ -171,12 +174,14 @@ export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]
   const querySnapshot = await getDocs(q);
 
   return querySnapshot.docs.map((doc) => {
-    const data = doc.data() as RestaurantFirestoreData; // Firestore data will have cuisine as string[]
+    const data = doc.data() as RestaurantFirestoreData;
     return {
       id: doc.id,
       name: data.name,
-      cuisine: data.cuisine, // cuisine is already string[]
+      cuisine: data.cuisine,
       address: data.address,
+      latitude: data.latitude,
+      longitude: data.longitude,
       imageUrl: data.imageUrl,
       description: data.description,
     } as AppRestaurantType;

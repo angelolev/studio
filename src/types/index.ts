@@ -17,8 +17,10 @@ export interface Restaurant {
   name: string;
   imageUrl: string;
   description: string;
-  cuisine: string[]; // Changed from string to string[]
-  address: string;
+  cuisine: string[];
+  address?: string; // Made optional
+  latitude: number;
+  longitude: number;
   // Optional: add fields like createdAt if you store timestamps
   // createdAt?: FirestoreTimestamp | number;
 }

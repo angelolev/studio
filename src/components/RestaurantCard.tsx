@@ -31,15 +31,34 @@ import { Loader2, MapPin } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import type { LatLngExpression, Icon as LeafletIcon } from 'leaflet';
+import L from 'leaflet';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
 }
 
+// Fix for default Leaflet icon issue (can be defined globally or per component)
+let DefaultIcon: LeafletIcon;
+if (typeof window !== 'undefined') {
+ DefaultIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+ L.Marker.prototype.options.icon = DefaultIcon;
+}
+
+
 export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const { user, loadingAuthState } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [mapReadyDialog, setMapReadyDialog] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -54,7 +73,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     staleTime: 5 * 60 * 1000,
-    enabled: true, // Fetch reviews when card mounts
+    enabled: true, 
     select: (data) =>
       data.map((review) => ({
         ...review,
@@ -71,6 +90,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     enabled: isDialogOpen && !!user && !loadingAuthState,
     staleTime: 5 * 60 * 1000,
   });
+
+  useEffect(() => {
+    if (isDialogOpen && typeof window !== 'undefined') {
+      setMapReadyDialog(true);
+    }
+  }, [isDialogOpen]);
 
   useEffect(() => {
     if (reviewsError) {
@@ -134,6 +159,11 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     return undefined;
   }, [restaurant.imageUrl, restaurant.cuisine]);
 
+  const restaurantLocation: LatLngExpression | undefined = 
+    restaurant.latitude && restaurant.longitude 
+      ? [restaurant.latitude, restaurant.longitude] 
+      : undefined;
+
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -173,6 +203,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             >
               {cuisineNames}
             </p>
+             {restaurant.address && (
+                <p className="text-xs text-muted-foreground truncate mt-0.5 flex items-center">
+                    <MapPin size={12} className="mr-1 shrink-0" />
+                    {restaurant.address}
+                </p>
+            )}
           </div>
           
           <div
@@ -196,10 +232,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <DialogDescription className="text-base">
              {cuisineNames}
           </DialogDescription>
-          <div className="flex items-center text-sm text-muted-foreground mt-1">
-            <MapPin size={14} className="mr-1.5 shrink-0" />
-            <span>{restaurant.address}</span>
-          </div>
+          {restaurant.address && (
+            <div className="flex items-center text-sm text-muted-foreground mt-1">
+                <MapPin size={14} className="mr-1.5 shrink-0" />
+                <span>{restaurant.address}</span>
+            </div>
+          )}
           <div className="flex items-center pt-2">
             <StarRating rating={averageRating} readOnly />
             <span className="ml-2 text-sm text-muted-foreground">
@@ -207,6 +245,27 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             </span>
           </div>
         </DialogHeader>
+
+        {restaurantLocation && mapReadyDialog && (
+          <div className="my-4">
+            <MapContainer
+              center={restaurantLocation}
+              zoom={15}
+              scrollWheelZoom={false}
+              style={{ height: '200px', width: '100%', borderRadius: 'var(--radius)' }}
+              className="z-0"
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <Marker position={restaurantLocation}>
+                <Popup>{restaurant.name}</Popup>
+              </Marker>
+            </MapContainer>
+          </div>
+        )}
+        
         <Separator className="my-4" />
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
           <ReviewSummary

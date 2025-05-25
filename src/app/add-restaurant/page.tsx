@@ -3,12 +3,15 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link'; // Import Link
+import Link from 'next/link';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
+import { MapContainer, TileLayer, Marker, useMapEvents, Popup } from 'react-leaflet';
+import type { LatLngExpression, Icon as LeafletIcon } from 'leaflet';
+import L from 'leaflet'; // Import L for custom icon
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,15 +23,36 @@ import { useToast } from '@/hooks/use-toast';
 import type { Restaurant } from '@/types';
 import { addRestaurantToFirestore } from '@/lib/firestoreService';
 import { cuisines as allCuisines } from '@/data/cuisines';
-import { Loader2, Camera, UploadCloud, VideoOff, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { Loader2, Camera, UploadCloud, VideoOff, ArrowLeft, MapPin } from 'lucide-react';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
+// Default map center (e.g., Lima, Peru)
+const DEFAULT_MAP_CENTER: LatLngExpression = [-12.046374, -77.042793];
+const DEFAULT_MAP_ZOOM = 13;
+
+// Fix for default Leaflet icon issue with Webpack/Next.js
+let DefaultIcon: LeafletIcon;
+if (typeof window !== 'undefined') {
+  DefaultIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+  L.Marker.prototype.options.icon = DefaultIcon;
+}
+
+
 const addRestaurantSchema = z.object({
   name: z.string().min(2, { message: 'El nombre del restaurante debe tener al menos 2 caracteres.' }),
   cuisine: z.array(z.string()).min(1, { message: 'Por favor, selecciona al menos una categoría.' }),
-  address: z.string().min(5, { message: 'La dirección debe tener al menos 5 caracteres.' }),
+  latitude: z.number({ required_error: "Por favor, selecciona una ubicación en el mapa." }),
+  longitude: z.number({ required_error: "Por favor, selecciona una ubicación en el mapa." }),
+  address: z.string().optional(), // Address is now optional
   image: z
     .custom<File>()
     .refine((file) => !!file, "Se requiere una imagen.")
@@ -42,12 +66,41 @@ const addRestaurantSchema = z.object({
 
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
 
+function LocationMarker({ onPositionChange }: { onPositionChange: (latlng: L.LatLng) => void }) {
+  const [position, setPosition] = useState<L.LatLng | null>(null);
+  const map = useMapEvents({
+    click(e) {
+      setPosition(e.latlng);
+      onPositionChange(e.latlng);
+      map.flyTo(e.latlng, map.getZoom());
+    },
+  });
+
+  useEffect(() => { // Set initial marker if no position is set yet after map loads
+    if (!position && map) {
+      const initialCenter = map.getCenter();
+       // setPosition(initialCenter); // Optionally set marker at initial center
+       // onPositionChange(initialCenter); // And report it
+    }
+  }, [map, position, onPositionChange]);
+
+
+  return position === null ? null : (
+    <Marker position={position}>
+      <Popup>Has seleccionado esta ubicación</Popup>
+    </Marker>
+  );
+}
+
+
 export default function AddRestaurantPage() {
   const { user, loadingAuthState } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -56,6 +109,8 @@ export default function AddRestaurantPage() {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+  const [selectedMapPosition, setSelectedMapPosition] = useState<LatLngExpression | null>(null);
+
 
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
@@ -64,8 +119,18 @@ export default function AddRestaurantPage() {
       cuisine: [],
       address: '',
       image: undefined,
+      // latitude and longitude will be set by map interaction
     },
   });
+
+   useEffect(() => {
+    // Ensure Leaflet's CSS and JS are fully loaded and window object is available
+    // This helps ensure the map initializes correctly, especially with dynamic imports or complex setups.
+    if (typeof window !== 'undefined') {
+      setMapReady(true);
+    }
+  }, []);
+
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -156,7 +221,7 @@ export default function AddRestaurantPage() {
   }, [stream, isCameraOpen]);
 
   const mutation = useMutation({
-    mutationFn: (data: { restaurantData: Pick<Restaurant, 'name' | 'cuisine' | 'address'>, imageFile?: File }) =>
+    mutationFn: (data: { restaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>, imageFile?: File }) =>
       addRestaurantToFirestore(data.restaurantData, data.imageFile),
     onSuccess: (data) => {
       toast({
@@ -166,6 +231,7 @@ export default function AddRestaurantPage() {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       form.reset();
       setImagePreview(null);
+      setSelectedMapPosition(null); // Reset map position
       router.push('/');
     },
     onError: (error) => {
@@ -189,6 +255,14 @@ export default function AddRestaurantPage() {
             variant: "destructive",
         });
         return;
+    }
+    if (restaurantData.latitude === undefined || restaurantData.longitude === undefined) {
+      toast({
+        title: "Ubicación Requerida",
+        description: "Por favor, selecciona la ubicación del restaurante en el mapa.",
+        variant: "destructive",
+      });
+      return;
     }
     mutation.mutate({ restaurantData, imageFile });
   };
@@ -268,7 +342,7 @@ export default function AddRestaurantPage() {
                   <FormItem>
                     <FormLabel>Cocina / Categorías</FormLabel>
                     <FormControl>
-                      <div className="flex flex-wrap gap-2 pt-2">
+                       <div className="flex flex-wrap gap-2 pt-2">
                         {allCuisines.map((cuisineItem) => {
                           const isSelected = field.value?.includes(cuisineItem.id);
                           return (
@@ -301,19 +375,61 @@ export default function AddRestaurantPage() {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
-                name="address"
+                name="latitude" // Also longitude, but map handles both
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Dirección</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: Calle Principal 123, Cualquier Ciudad" {...field} />
-                    </FormControl>
+                    <FormLabel>Ubicación en el Mapa</FormLabel>
+                     <FormDescription>
+                       Haz clic en el mapa para seleccionar la ubicación del restaurante.
+                     </FormDescription>
+                    {mapReady ? (
+                      <MapContainer
+                        center={selectedMapPosition || DEFAULT_MAP_CENTER}
+                        zoom={DEFAULT_MAP_ZOOM}
+                        scrollWheelZoom={true}
+                        style={{ height: '300px', width: '100%', borderRadius: 'var(--radius)' }}
+                        className="z-0" // Ensure map is rendered correctly
+                      >
+                        <TileLayer
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <LocationMarker
+                          onPositionChange={(latlng) => {
+                            setSelectedMapPosition([latlng.lat, latlng.lng]);
+                            form.setValue('latitude', latlng.lat, { shouldValidate: true });
+                            form.setValue('longitude', latlng.lng, { shouldValidate: true });
+                          }}
+                        />
+                      </MapContainer>
+                    ) : (
+                      <div className="h-[300px] w-full flex items-center justify-center bg-muted rounded-md">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="ml-2">Cargando mapa...</p>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
               />
+               <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dirección (Opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ej: Calle Principal 123, Cualquier Ciudad" {...field} />
+                    </FormControl>
+                    <FormDescription>Puedes agregar una dirección textual como referencia.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
 
               {isTakingPhoto && isCameraOpen ? (
                  <div className="space-y-4">
