@@ -53,12 +53,11 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   } = useQuery<ReviewWithNumericTimestamp[], Error, AppReviewType[]>({
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
-    // enabled: isDialogOpen, // Removed to load reviews immediately for card display
     staleTime: 5 * 60 * 1000, // 5 minutes
     select: (data) =>
       data.map((review) => ({
         ...review,
-        timestamp: review.timestamp,
+        timestamp: review.timestamp, // Already a number
       })),
   });
 
@@ -68,7 +67,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   } = useQuery<boolean, Error>({
     queryKey: userReviewedQueryKey,
     queryFn: () => checkIfUserReviewed(restaurant.id, user!.uid),
-    enabled: isDialogOpen && !!user && !loadingAuthState, // Only check when dialog is open and user is available
+    enabled: isDialogOpen && !!user && !loadingAuthState,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -118,19 +117,21 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   }, [restaurant.cuisine]);
 
   const imageHint = useMemo(() => {
-    if (restaurant.imageUrl.startsWith("https://placehold.co")) {
+    if (restaurant.imageUrl && restaurant.imageUrl.startsWith("https://placehold.co")) {
       const cuisineForHint = allCuisines.find(
         (c) => c.id === restaurant.cuisine
       );
       if (cuisineForHint && cuisineForHint.name) {
-        // Take the first word of the cuisine name for a more specific hint
         return cuisineForHint.name.split(" ")[0].toLowerCase();
       }
-      // Fallback for "Otro" or if cuisine name is not found/simple
       return "logo restaurante";
     }
-    return undefined; // No hint if it's a real image
+    // If it's a user-uploaded image (not a placeholder), we might not need a generic hint,
+    // or we could derive it from the restaurant name if desired.
+    // For now, no hint for non-placeholder images.
+    return undefined;
   }, [restaurant.imageUrl, restaurant.cuisine]);
+
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -149,11 +150,11 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <div className="flex-shrink-0">
             <Image
               src={restaurant.imageUrl}
-              alt={`${restaurant.name} logo`}
+              alt={restaurant.name || 'Logo del restaurante'}
               width={64}
               height={64}
               className="rounded-md object-cover aspect-square"
-              data-ai-hint={imageHint}
+              data-ai-hint={imageHint} // Keep this if you have a system using it
             />
           </div>
 
@@ -172,12 +173,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             </p>
           </div>
           
-          {/* Rating section - clickable part of the Card */}
           <div
             className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto"
-            aria-label={`Ver detalles y opiniones de ${restaurant.name}`}
           >
-            {isLoadingReviews && !isDialogOpen ? ( // Show mini-loader only if dialog is not open
+            {isLoadingReviews && !isDialogOpen ? (
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
             ) : (
               <StarRating rating={averageRating} readOnly size={16} />
@@ -243,7 +242,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           )}
 
           {!loadingAuthState && !user && (
-            <p className="text-left italic text-sm p-2 text-indigo-500 font-bold text-accent-foreground">
+            <p className="text-left italic text-sm p-2 text-accent-foreground">
               Inicia sesión para dejar tu opinión.
             </p>
           )}
@@ -276,7 +275,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             !isLoadingUserReviewedCheck &&
             !showReviewForm &&
             userHasAlreadyReviewed && (
-              <p className="text-left italic text-sm p-2 text-indigo-500 font-bold text-accent-foreground">
+              <p className="text-left italic text-sm p-2 text-accent-foreground">
                 Ya has dejado tu opinión en este restaurante. ¡Gracias por tu
                 ayuda!
               </p>
@@ -291,4 +290,3 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
-

@@ -1,29 +1,42 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Restaurant } from '@/types';
 import { addRestaurantToFirestore } from '@/lib/firestoreService';
-import { cuisines } from '@/data/cuisines'; 
+import { cuisines } from '@/data/cuisines';
 import { Loader2 } from 'lucide-react';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, { message: 'El nombre del restaurante debe tener al menos 2 caracteres.' }),
   cuisine: z.string().min(1, { message: 'Por favor, selecciona una categoría.' }),
   address: z.string().min(5, { message: 'La dirección debe tener al menos 5 caracteres.' }),
+  image: z
+    .custom<FileList>()
+    .refine((files) => files && files.length > 0, "Se requiere una imagen.")
+    .refine((files) => files && files[0]?.size <= MAX_FILE_SIZE, `El tamaño máximo del archivo es 5MB.`)
+    .refine(
+      (files) => files && ACCEPTED_IMAGE_TYPES.includes(files[0]?.type),
+      "Solo se aceptan formatos .jpg, .jpeg, .png y .webp."
+    )
+    .optional(), // Make it optional for now, or remove .optional() to require it
 });
 
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
@@ -33,6 +46,7 @@ export default function AddRestaurantPage() {
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
@@ -55,7 +69,8 @@ export default function AddRestaurantPage() {
   }, [user, loadingAuthState, router, toast]);
 
   const mutation = useMutation({
-    mutationFn: (newRestaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>) => addRestaurantToFirestore(newRestaurantData),
+    mutationFn: (data: { restaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>, imageFile?: File }) =>
+      addRestaurantToFirestore(data.restaurantData, data.imageFile),
     onSuccess: (data) => {
       toast({
         title: '¡Restaurante Agregado!',
@@ -63,6 +78,7 @@ export default function AddRestaurantPage() {
       });
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       form.reset();
+      setImagePreview(null);
       router.push('/');
     },
     onError: (error) => {
@@ -76,8 +92,26 @@ export default function AddRestaurantPage() {
 
   const onSubmit: SubmitHandler<AddRestaurantFormData> = (data) => {
     if (!user) return;
-    mutation.mutate(data);
+    const { image, ...restaurantData } = data;
+    const imageFile = image && image.length > 0 ? image[0] : undefined;
+    mutation.mutate({ restaurantData, imageFile });
   };
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      form.setValue("image", event.target.files as FileList); // Set value for react-hook-form
+    } else {
+      setImagePreview(null);
+      form.setValue("image", undefined);
+    }
+  };
+
 
   if (loadingAuthState) {
     return (
@@ -89,6 +123,8 @@ export default function AddRestaurantPage() {
   }
 
   if (!user) {
+    // This case should ideally be handled by the useEffect redirect,
+    // but as a fallback:
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-lg text-destructive">Acceso Denegado.</p>
@@ -164,6 +200,39 @@ export default function AddRestaurantPage() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="image"
+                render={({ field: { onChange, value, ...rest } }) => ( // Destructure field correctly
+                  <FormItem>
+                    <FormLabel>Imagen del Restaurante</FormLabel>
+                    <FormControl>
+                       <Input
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                        onChange={(e) => {
+                           handleImageChange(e); // Use our custom handler
+                        }}
+                        className="file:text-primary file:font-semibold file:bg-primary/10 hover:file:bg-primary/20"
+                        {...rest} // Pass rest of props
+                      />
+                    </FormControl>
+                     <FormDescription>
+                      Sube una imagen para tu restaurante (JPG, PNG, WebP, max 5MB).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {imagePreview && (
+                <div className="mt-4">
+                  <FormLabel>Vista Previa de la Imagen</FormLabel>
+                  <div className="mt-2 relative w-full aspect-video rounded-md overflow-hidden border">
+                    <Image src={imagePreview} alt="Vista previa de la imagen" layout="fill" objectFit="cover" />
+                  </div>
+                </div>
+              )}
+
               <Button type="submit" className="w-full" disabled={mutation.isPending}>
                 {mutation.isPending ? (
                   <>

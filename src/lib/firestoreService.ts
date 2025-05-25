@@ -1,7 +1,7 @@
 
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase"; // Import storage
 import type { Review as AppReviewType, Restaurant as AppRestaurantType, Cuisine as AppCuisineType } from "@/types";
 import {
   collection,
@@ -13,9 +13,9 @@ import {
   getCountFromServer,
   getDocs,
   serverTimestamp,
-  doc,
-  setDoc,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Firebase Storage imports
+import { v4 as uuidv4 } from 'uuid';
 
 // --- Review Types and Functions ---
 export interface ReviewFirestoreData {
@@ -58,7 +58,7 @@ export async function addReviewToFirestore(
     throw new Error("Se requiere ID de usuario para agregar una opinión.");
   }
   const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
-  const docData = {
+  const docData: ReviewFirestoreData = { // Ensure correct type here
     ...reviewData,
     restaurantId,
     timestamp: serverTimestamp(),
@@ -85,11 +85,11 @@ export async function getReviewsFromFirestore(
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
-    const timestamp = data.timestamp as Timestamp;
+    const timestamp = data.timestamp as Timestamp | null; // Firestore timestamp can be null before server commits
     return {
       id: doc.id,
       ...data,
-      timestamp: timestamp ? timestamp.toMillis() : Date.now(),
+      timestamp: timestamp ? timestamp.toMillis() : Date.now(), // Handle potential null timestamp
     } as ReviewWithNumericTimestamp;
   });
 }
@@ -109,27 +109,40 @@ export async function checkIfUserReviewed(
 
 export interface RestaurantFirestoreData {
   name: string;
-  cuisine: string; 
+  cuisine: string;
   address: string;
   imageUrl: string;
   description: string;
   createdAt: Timestamp | ReturnType<typeof serverTimestamp>;
 }
 
-export interface RestaurantWithNumericTimestamp extends Omit<AppRestaurantType, 'id'> {
-  id: string;
-  createdAt?: number;
-}
-
 export async function addRestaurantToFirestore(
-  restaurantData: Pick<AppRestaurantType, 'name' | 'cuisine' | 'address'>
+  restaurantData: Pick<AppRestaurantType, 'name' | 'cuisine' | 'address'>,
+  imageFile?: File
 ): Promise<AppRestaurantType> {
-
   const restaurantColRef = collection(db, "restaurants");
+  let imageUrl = 'https://placehold.co/600x400.png'; // Default placeholder
+
+  if (imageFile) {
+    // Use a unique name for the image file to prevent overwrites
+    const imageName = `${uuidv4()}-${imageFile.name}`;
+    const storageRef = ref(storage, `restaurant-images/${imageName}`);
+    try {
+      const snapshot = await uploadBytes(storageRef, imageFile);
+      imageUrl = await getDownloadURL(snapshot.ref);
+    } catch (error) {
+      console.error("Error uploading image to Firebase Storage: ", error);
+      // Optionally, re-throw or handle the error (e.g., by still using placeholder)
+      // For now, if upload fails, it will still use the placeholder.
+      throw new Error("Error al subir la imagen. Por favor, intenta de nuevo.");
+    }
+  }
 
   const docData: RestaurantFirestoreData = {
-    ...restaurantData,
-    imageUrl: 'https://placehold.co/600x400.png',
+    name: restaurantData.name,
+    cuisine: restaurantData.cuisine,
+    address: restaurantData.address,
+    imageUrl: imageUrl,
     description: `Un restaurante especializado en ${restaurantData.cuisine}, ubicado en ${restaurantData.address}.`,
     createdAt: serverTimestamp(),
   };
@@ -148,7 +161,7 @@ export async function addRestaurantToFirestore(
 
 export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]> {
   const restaurantColRef = collection(db, "restaurants");
-  const q = query(restaurantColRef, orderBy("name", "asc"));
+  const q = query(restaurantColRef, orderBy("createdAt", "desc")); // Order by creation time
 
   const querySnapshot = await getDocs(q);
 
@@ -157,7 +170,7 @@ export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]
     return {
       id: doc.id,
       name: data.name,
-      cuisine: data.cuisine, 
+      cuisine: data.cuisine,
       address: data.address,
       imageUrl: data.imageUrl,
       description: data.description,
