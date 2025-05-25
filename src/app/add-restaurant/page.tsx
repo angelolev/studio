@@ -30,13 +30,13 @@ const addRestaurantSchema = z.object({
   cuisine: z.string().min(1, { message: 'Por favor, selecciona una categoría.' }),
   address: z.string().min(5, { message: 'La dirección debe tener al menos 5 caracteres.' }),
   image: z
-    .custom<File>() // Using File directly now
+    .custom<File>() 
     .refine((file) => file?.size <= MAX_FILE_SIZE, `El tamaño máximo del archivo es 5MB.`)
     .refine(
       (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type || ""),
       "Solo se aceptan formatos .jpg, .jpeg, .png y .webp."
     )
-    .optional(), // Optional because user might not upload/capture one
+    .optional(),
 });
 
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
@@ -50,6 +50,7 @@ export default function AddRestaurantPage() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileUploadInputRef = useRef<HTMLInputElement>(null); // Ref for the file input
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -77,7 +78,6 @@ export default function AddRestaurantPage() {
     }
   }, [user, loadingAuthState, router, toast]);
 
-  // Camera permission logic
   const getCameraPermission = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       toast({
@@ -109,12 +109,12 @@ export default function AddRestaurantPage() {
   };
 
   const openCamera = async () => {
-    setIsTakingPhoto(true); // Show camera UI elements
+    setIsTakingPhoto(true); 
     setIsCameraOpen(true);
     if (hasCameraPermission === null || hasCameraPermission === false) {
       await getCameraPermission();
     } else if (hasCameraPermission === true && stream && videoRef.current) {
-       videoRef.current.srcObject = stream; // Re-assign if already have stream
+       videoRef.current.srcObject = stream; 
     }
   };
 
@@ -124,7 +124,6 @@ export default function AddRestaurantPage() {
     }
     setIsCameraOpen(false);
     setStream(null);
-    // Don't set isTakingPhoto to false here if we want to keep showing the preview
   };
 
   const capturePhoto = () => {
@@ -145,12 +144,11 @@ export default function AddRestaurantPage() {
         }, 'image/jpeg');
       }
       closeCamera();
-      setIsTakingPhoto(false); // Now hide camera UI
+      setIsTakingPhoto(false); 
     }
   };
 
   useEffect(() => {
-    // Cleanup stream on component unmount or when camera is closed
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -201,7 +199,7 @@ export default function AddRestaurantPage() {
       form.setValue('image', undefined);
       setImagePreview(null);
     }
-    setIsTakingPhoto(false); // If user uploads, ensure camera UI is hidden
+    setIsTakingPhoto(false); 
   };
 
 
@@ -298,7 +296,7 @@ export default function AddRestaurantPage() {
                       {hasCameraPermission === false && (
                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
                             <Alert variant="destructive">
-                                <VideoOff className="h-5 w-5" />
+                                <VideoOff className="mr-2 h-5 w-5" />
                                 <AlertTitle>Acceso a Cámara Denegado</AlertTitle>
                                 <AlertDescription>
                                 Revisa los permisos de cámara de tu navegador.
@@ -322,27 +320,38 @@ export default function AddRestaurantPage() {
                   <FormField
                     control={form.control}
                     name="image"
-                    render={({ field }) => (
+                    render={({ field: imageField }) => ( // Renamed field to imageField for clarity
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
                         <div className="flex flex-col sm:flex-row gap-2">
                            <Button type="button" onClick={openCamera} variant="outline" className="flex-1">
-                             <Camera className="mr-2" /> Tomar Foto
+                             <Camera className="mr-2 h-4 w-4" /> Tomar Foto
                            </Button>
-                           <FormControl>
-                             <Button asChild variant="outline" className="flex-1 cursor-pointer">
-                               <div>
-                                 <UploadCloud className="mr-2" /> Subir Imagen
-                                 <Input
-                                  type="file"
-                                  className="sr-only" // Hidden but accessible
-                                  accept="image/png, image/jpeg, image/jpg, image/webp"
-                                  onChange={handleImageFileChange}
-                                  // {...field} but onChange is handled
-                                />
-                               </div>
-                             </Button>
-                           </FormControl>
+                           <Button
+                              type="button"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => fileUploadInputRef.current?.click()}
+                            >
+                              <UploadCloud className="mr-2 h-4 w-4" /> Subir Imagen
+                            </Button>
+                            <FormControl>
+                              <Input
+                                type="file"
+                                className="sr-only"
+                                accept="image/png, image/jpeg, image/jpg, image/webp"
+                                ref={(instance) => {
+                                  fileUploadInputRef.current = instance;
+                                  imageField.ref(instance); // Connect RHF's ref
+                                }}
+                                onChange={(e) => {
+                                  handleImageFileChange(e);
+                                  // imageField.onChange(e.target.files?.[0]); // RHF can also track like this
+                                }}
+                                // name={imageField.name} // Not needed as Controller handles it
+                                // onBlur={imageField.onBlur} // Not needed as Controller handles it
+                              />
+                            </FormControl>
                         </div>
                         <FormDescription>
                           Toma una foto o sube una imagen (JPG, PNG, WebP, max 5MB).
