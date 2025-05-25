@@ -16,7 +16,8 @@ export function ThemeToggle() {
   }, []);
 
   if (!mounted) {
-    return <Button variant="ghost" size="icon" disabled className="h-10 w-10 hover:bg-transparent" />;
+    // Prevents hydration mismatch by rendering a disabled button shell SSR
+    return <Button variant="ghost" size="icon" disabled className="h-10 w-10 opacity-0" />;
   }
 
   const toggleTheme = () => {
@@ -28,12 +29,12 @@ export function ThemeToggle() {
   };
 
   return (
-    <Button 
-      variant="ghost" 
-      size="icon" 
-      onClick={toggleTheme} 
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={toggleTheme}
       aria-label="Cambiar tema"
-      className="hover:bg-transparent" // Removed hover effect
+      className="hover:bg-transparent hover:text-current" // Added hover:text-current
     >
       {resolvedTheme === 'dark' ? (
         <Sun className="h-[1.2rem] w-[1.2rem] transition-all" />
