@@ -26,15 +26,17 @@ import { Loader2, Camera, UploadCloud, VideoOff, ArrowLeft, MapPin, LocateFixed 
 
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
-const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
+// We'll load Marker and Popup dynamically and pass them to LocationMarker
+const BaseMarker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
+const BasePopup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
 const useMapEvents = dynamic(() => import('react-leaflet').then(mod => mod.useMapEvents), { ssr: false });
+
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
-const DEFAULT_MAP_CENTER_LIMA: LatLngExpression = [-12.046374, -77.042793]; // Lima, Peru
-const DEFAULT_MAP_ZOOM = 15; // Increased default zoom
+const DEFAULT_MAP_CENTER_LIMA: LatLngExpression = [-12.046374, -77.042793];
+const DEFAULT_MAP_ZOOM = 15;
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, { message: 'El nombre del restaurante debe tener al menos 2 caracteres.' }),
@@ -58,55 +60,55 @@ type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
 interface LocationMarkerProps {
   onPositionChange: (latlng: LatLng) => void;
   initialPosition?: LatLng | null;
-  L: typeof import('leaflet');
-  DefaultIcon: typeof LeafletIconType.Default;
+  L: typeof import('leaflet') | null;
+  DefaultIcon: typeof LeafletIconType.Default | null;
+  MarkerComponent: typeof BaseMarker | null; 
+  PopupComponent: typeof BasePopup | null;   
+  UseMapEventsHook: typeof useMapEvents | null;
 }
 
-function LocationMarker({ onPositionChange, initialPosition, L, DefaultIcon }: LocationMarkerProps) {
-  const [position, setPosition] = useState<LatLng | null>(null);
-  const UseMapEvents = useMapEvents;
+// Define LocationMarker outside of AddRestaurantPage
+function LocationMarker({ 
+  onPositionChange, 
+  initialPosition, 
+  L, 
+  DefaultIcon,
+  MarkerComponent,
+  PopupComponent,
+  UseMapEventsHook
+}: LocationMarkerProps) {
+  const [markerPosition, setMarkerPosition] = useState<LatLng | null>(initialPosition || null);
+  
+  // This hook MUST be called unconditionally at the top level.
+  // It will only be truly active if UseMapEventsHook is not null (i.e., loaded)
+  const map = UseMapEventsHook ? UseMapEventsHook({
+    click(e) {
+      if (L && DefaultIcon && MarkerComponent && PopupComponent) { 
+        const newPosition = e.latlng;
+        setMarkerPosition(newPosition);
+        onPositionChange(newPosition);
+      }
+    },
+  }) : null;
+
 
   useEffect(() => {
-    // Synchronize local position with initialPosition from parent
-    if (initialPosition) {
-      setPosition(initialPosition);
-    } else {
-      setPosition(null);
-    }
+    setMarkerPosition(initialPosition || null);
   }, [initialPosition]);
 
-  if (!UseMapEvents || !L || !DefaultIcon) {
-    return null;
-  }
-
-  const map = UseMapEvents({
-    click(e) {
-      setPosition(e.latlng);
-      onPositionChange(e.latlng);
-      // No map.flyTo here; parent MapContainer's `center` prop handles centering based on `selectedMapPosition`
-    },
-  });
-
-  if (!position) {
+  if (!L || !DefaultIcon || !markerPosition || !MarkerComponent || !PopupComponent || !map) {
     return null;
   }
   
-  // Ensure DefaultIcon is a constructor before calling new
-  const markerIcon = (typeof DefaultIcon === 'function')
-    ? new DefaultIcon({ imagePath: '/_next/static/media/' })
-    : undefined;
-
-  if (!markerIcon) {
-    console.error("LocationMarker: DefaultIcon is not available or not a constructor.");
-    return null; 
-  }
+  const iconInstance = new DefaultIcon();
 
   return (
-    <Marker position={position} icon={markerIcon}>
-      <Popup>Has seleccionado esta ubicación</Popup>
-    </Marker>
+    <MarkerComponent position={markerPosition} icon={iconInstance}>
+      <PopupComponent>Has seleccionado esta ubicación</PopupComponent>
+    </MarkerComponent>
   );
 }
+
 
 export default function AddRestaurantPage() {
   const { user, loadingAuthState } = useAuth();
@@ -114,6 +116,7 @@ export default function AddRestaurantPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
   const [mapReady, setMapReady] = useState(false);
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(DEFAULT_MAP_CENTER_LIMA);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -129,6 +132,11 @@ export default function AddRestaurantPage() {
 
   const [L, setL] = useState<typeof import('leaflet') | null>(null);
   const [ActualDefaultIcon, setActualDefaultIcon] = useState<typeof LeafletIconType.Default | null>(null);
+  
+  const [MarkerForLocation, setMarkerForLocation] = useState<typeof BaseMarker | null>(null);
+  const [PopupForLocation, setPopupForLocation] = useState<typeof BasePopup | null>(null);
+  const [UseMapEventsForLocation, setUseMapEventsForLocation] = useState<typeof useMapEvents | null>(null);
+
 
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
@@ -141,46 +149,54 @@ export default function AddRestaurantPage() {
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      import('leaflet').then(leafletModule => {
-        setL(leafletModule);
-        // Correctly configure the default icon path for Next.js/Webpack
-        // This ensures Leaflet's Icon.Default class itself is stored
-        setActualDefaultIcon(() => leafletModule.Icon.Default);
-        setMapReady(true); // Set mapReady after L and DefaultIcon are potentially set
+    Promise.all([
+      import('leaflet'),
+      import('react-leaflet').then(mod => mod.Marker),
+      import('react-leaflet').then(mod => mod.Popup),
+      import('react-leaflet').then(mod => mod.useMapEvents),
+    ]).then(([leafletModule, MarkerComp, PopupComp, UseMapEventsComp]) => {
+      setL(leafletModule);
+      // Types for react-leaflet components loaded via dynamic import can be tricky.
+      // Casting to any temporarily if direct type assertion fails, then to the target.
+      setMarkerForLocation(() => MarkerComp as any as typeof BaseMarker);
+      setPopupForLocation(() => PopupComp as any as typeof BasePopup);
+      setUseMapEventsForLocation(() => UseMapEventsComp as any as typeof useMapEvents);
+      
+      const IconDefault = leafletModule.Icon.Default;
+      if (!IconDefault.prototype.options.imagePath) { // Ensure this runs only once
+        IconDefault.prototype.options.imagePath = '/_next/static/media/';
+      }
+      setActualDefaultIcon(() => IconDefault);
+      setMapReady(true);
+    }).catch(error => {
+      console.error("Failed to load Leaflet or react-leaflet components:", error);
+      toast({ title: "Error", description: "No se pudo cargar el módulo del mapa.", variant: "destructive" });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array to run once on mount
 
-         // Try to get user's current location
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const userLatLng: LatLngExpression = [position.coords.latitude, position.coords.longitude];
-              if (!form.getValues('latitude') && !form.getValues('longitude')) {
-                 setCurrentMapCenter(userLatLng);
-                 if (mapRef.current) {
-                    mapRef.current.flyTo(userLatLng, DEFAULT_MAP_ZOOM + 2); // Zoom in a bit more
-                 }
-              }
-            },
-            (error) => {
-              console.warn(`Error obteniendo geolocalización: ${error.message}`);
-              if (!form.getValues('latitude') && !form.getValues('longitude')) {
-                setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
-              }
-            },
-            { timeout: 10000 }
-          );
-        } else {
-           if (!form.getValues('latitude') && !form.getValues('longitude')) {
-             setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
-           }
-        }
-      }).catch(error => {
-        console.error("Failed to load Leaflet module:", error);
-        // Handle error, maybe set mapReady to false or show an error message
-      });
+  const latitudeValue = form.watch('latitude');
+  const longitudeValue = form.watch('longitude');
+
+  useEffect(() => {
+    if (mapReady && navigator.geolocation) {
+      if (latitudeValue === undefined && longitudeValue === undefined) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const userLatLng: LatLngExpression = [position.coords.latitude, position.coords.longitude];
+            setCurrentMapCenter(userLatLng);
+            if (mapRef.current) {
+              mapRef.current.flyTo(userLatLng, DEFAULT_MAP_ZOOM + 2);
+            }
+          },
+          (error) => {
+            console.warn(`Error obteniendo geolocalización: ${error.message}`);
+          },
+          { timeout: 10000 }
+        );
+      }
     }
-  }, [form]); // Added form to dependency array for getValues
-
+  }, [mapReady, latitudeValue, longitudeValue]);
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -473,7 +489,7 @@ export default function AddRestaurantPage() {
                      <FormDescription>
                        Haz clic en el mapa para seleccionar la ubicación del restaurante.
                      </FormDescription>
-                    {(mapReady && L && ActualDefaultIcon) ? (
+                    {(mapReady && L && ActualDefaultIcon && MapContainer && TileLayer && MarkerForLocation && PopupForLocation && UseMapEventsForLocation) ? (
                       <MapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
@@ -488,6 +504,9 @@ export default function AddRestaurantPage() {
                         <LocationMarker
                           L={L}
                           DefaultIcon={ActualDefaultIcon}
+                          MarkerComponent={MarkerForLocation}
+                          PopupComponent={PopupForLocation}
+                          UseMapEventsHook={UseMapEventsForLocation}
                           initialPosition={selectedMapPosition}
                           onPositionChange={(latlng) => {
                             setSelectedMapPosition(latlng);
