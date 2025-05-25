@@ -9,9 +9,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
-import { MapContainer, TileLayer, Marker, useMapEvents, Popup } from 'react-leaflet';
-import type { LatLngExpression, Icon as LeafletIcon } from 'leaflet';
-import L from 'leaflet'; // Import L for custom icon
+import type { LatLngExpression, LatLng } from 'leaflet'; // Keep type import for LatLng
+// Removed: import L from 'leaflet'; // Ensure no top-level L import
+import dynamic from 'next/dynamic';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,34 +25,25 @@ import { addRestaurantToFirestore } from '@/lib/firestoreService';
 import { cuisines as allCuisines } from '@/data/cuisines';
 import { Loader2, Camera, UploadCloud, VideoOff, ArrowLeft, MapPin } from 'lucide-react';
 
+const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
+const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
+const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
+const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
+const useMapEvents = dynamic(() => import('react-leaflet').then(mod => mod.useMapEvents), { ssr: false });
+
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
-// Default map center (e.g., Lima, Peru)
 const DEFAULT_MAP_CENTER: LatLngExpression = [-12.046374, -77.042793];
 const DEFAULT_MAP_ZOOM = 13;
-
-// Fix for default Leaflet icon issue with Webpack/Next.js
-let DefaultIcon: LeafletIcon;
-if (typeof window !== 'undefined') {
-  DefaultIcon = L.icon({
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-  });
-  L.Marker.prototype.options.icon = DefaultIcon;
-}
-
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, { message: 'El nombre del restaurante debe tener al menos 2 caracteres.' }),
   cuisine: z.array(z.string()).min(1, { message: 'Por favor, selecciona al menos una categoría.' }),
   latitude: z.number({ required_error: "Por favor, selecciona una ubicación en el mapa." }),
   longitude: z.number({ required_error: "Por favor, selecciona una ubicación en el mapa." }),
-  address: z.string().optional(), // Address is now optional
+  address: z.string().optional(),
   image: z
     .custom<File>()
     .refine((file) => !!file, "Se requiere una imagen.")
@@ -66,9 +57,13 @@ const addRestaurantSchema = z.object({
 
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
 
-function LocationMarker({ onPositionChange }: { onPositionChange: (latlng: L.LatLng) => void }) {
-  const [position, setPosition] = useState<L.LatLng | null>(null);
-  const map = useMapEvents({
+function LocationMarker({ onPositionChange }: { onPositionChange: (latlng: LatLng) => void }) {
+  const [position, setPosition] = useState<LatLng | null>(null);
+  const UseMapEvents = useMapEvents;
+
+  if (!UseMapEvents) return null;
+
+  const map = UseMapEvents({
     click(e) {
       setPosition(e.latlng);
       onPositionChange(e.latlng);
@@ -76,15 +71,13 @@ function LocationMarker({ onPositionChange }: { onPositionChange: (latlng: L.Lat
     },
   });
 
-  useEffect(() => { // Set initial marker if no position is set yet after map loads
+  useEffect(() => {
     if (!position && map) {
-      const initialCenter = map.getCenter();
-       // setPosition(initialCenter); // Optionally set marker at initial center
-       // onPositionChange(initialCenter); // And report it
+      // const initialCenter = map.getCenter();
     }
   }, [map, position, onPositionChange]);
 
-
+  // Temporarily remove custom icon
   return position === null ? null : (
     <Marker position={position}>
       <Popup>Has seleccionado esta ubicación</Popup>
@@ -101,7 +94,6 @@ export default function AddRestaurantPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileUploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -111,6 +103,9 @@ export default function AddRestaurantPage() {
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
   const [selectedMapPosition, setSelectedMapPosition] = useState<LatLngExpression | null>(null);
 
+  // Temporarily remove L and ActualDefaultIcon state and effect
+  // const [L, setL] = useState<typeof import('leaflet') | null>(null);
+  // const [ActualDefaultIcon, setActualDefaultIcon] = useState<LeafletIcon | null>(null);
 
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
@@ -119,15 +114,25 @@ export default function AddRestaurantPage() {
       cuisine: [],
       address: '',
       image: undefined,
-      // latitude and longitude will be set by map interaction
     },
   });
 
    useEffect(() => {
-    // Ensure Leaflet's CSS and JS are fully loaded and window object is available
-    // This helps ensure the map initializes correctly, especially with dynamic imports or complex setups.
     if (typeof window !== 'undefined') {
       setMapReady(true);
+      // Temporarily remove L and ActualDefaultIcon setup
+      // import('leaflet').then(leafletModule => {
+      //   setL(leafletModule);
+      //   const icon = leafletModule.icon({
+      //     iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      //     shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      //     iconSize: [25, 41],
+      //     iconAnchor: [12, 41],
+      //     popupAnchor: [1, -34],
+      //     shadowSize: [41, 41]
+      //   });
+      //   setActualDefaultIcon(icon);
+      // });
     }
   }, []);
 
@@ -231,7 +236,7 @@ export default function AddRestaurantPage() {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       form.reset();
       setImagePreview(null);
-      setSelectedMapPosition(null); // Reset map position
+      setSelectedMapPosition(null);
       router.push('/');
     },
     onError: (error) => {
@@ -247,7 +252,7 @@ export default function AddRestaurantPage() {
     if (!user) return;
     const { image, ...restaurantData } = data;
     const imageFile = image instanceof File ? image : undefined;
-    
+
     if (!imageFile && !imagePreview) {
         toast({
             title: "Imagen Requerida",
@@ -352,8 +357,8 @@ export default function AddRestaurantPage() {
                               variant={isSelected ? "default" : "outline"}
                               size="sm"
                               className={`rounded-full px-3 py-1 h-auto text-sm transition-colors duration-150 ease-in-out
-                                          ${isSelected 
-                                            ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                                          ${isSelected
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                                             : 'bg-background text-foreground border-border hover:bg-accent hover:text-accent-foreground'
                                           }`}
                               onClick={() => {
@@ -378,20 +383,20 @@ export default function AddRestaurantPage() {
 
               <FormField
                 control={form.control}
-                name="latitude" // Also longitude, but map handles both
+                name="latitude"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Ubicación en el Mapa</FormLabel>
                      <FormDescription>
                        Haz clic en el mapa para seleccionar la ubicación del restaurante.
                      </FormDescription>
-                    {mapReady ? (
+                    {mapReady ? ( // Simplified condition, relying on dynamic import for react-leaflet components
                       <MapContainer
                         center={selectedMapPosition || DEFAULT_MAP_CENTER}
                         zoom={DEFAULT_MAP_ZOOM}
                         scrollWheelZoom={true}
                         style={{ height: '300px', width: '100%', borderRadius: 'var(--radius)' }}
-                        className="z-0" // Ensure map is rendered correctly
+                        className="z-0"
                       >
                         <TileLayer
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -429,7 +434,6 @@ export default function AddRestaurantPage() {
                   </FormItem>
                 )}
               />
-
 
               {isTakingPhoto && isCameraOpen ? (
                  <div className="space-y-4">
@@ -488,7 +492,7 @@ export default function AddRestaurantPage() {
                                 }}
                                 onChange={(e) => {
                                   handleImageFileChange(e);
-                                  imageField.onChange(e.target.files?.[0]); 
+                                  imageField.onChange(e.target.files?.[0]);
                                 }}
                               />
                             </FormControl>
@@ -528,3 +532,5 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
+
+    
