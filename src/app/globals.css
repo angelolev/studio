@@ -9,34 +9,34 @@ body {
 
 @layer base {
   :root {
-    /* Fresh & Clean Palette */
-    --background: 210 40% 98%; /* Very light, almost white-ish blue/gray */
-    --foreground: 210 20% 25%; /* Dark, desaturated blue/gray */
+    /* Warm & Inviting Palette */
+    --background: 30 50% 98%; /* Very light warm cream */
+    --foreground: 30 10% 25%; /* Dark, warm grey-brown */
 
-    --card: 0 0% 100%; /* White */
-    --card-foreground: 210 20% 25%; /* Same as main foreground */
+    --card: 0 0% 100%; /* White - kept for contrast */
+    --card-foreground: 30 10% 25%; /* Same as main foreground */
 
     --popover: 0 0% 100%; /* White */
-    --popover-foreground: 210 20% 25%;
+    --popover-foreground: 30 10% 25%;
 
-    --primary: 205 70% 55%; /* Calming medium blue */
-    --primary-foreground: 0 0% 100%; /* White for text on primary */
+    --primary: 25 80% 60%; /* Warm, friendly orange */
+    --primary-foreground: 25 80% 10%; /* Dark brown for text on primary */
 
-    --secondary: 210 30% 90%; /* Lighter gray-blue for secondary elements */
-    --secondary-foreground: 210 20% 30%; /* Slightly darker for text on secondary */
+    --secondary: 30 30% 92%; /* Light, warm beige */
+    --secondary-foreground: 30 10% 30%; /* Slightly darker warm grey-brown */
 
-    --muted: 210 30% 94%; /* Muted tones, slightly lighter than secondary */
-    --muted-foreground: 210 20% 45%; /* Lighter text for muted */
+    --muted: 30 40% 96%; /* Very light, warm beige */
+    --muted-foreground: 30 10% 45%; /* Soft, warm grey */
 
-    --accent: 160 60% 45%; /* Bright, friendly green/teal */
-    --accent-foreground: 160 70% 15%; /* Dark text for on accent */
+    --accent: 140 40% 55%; /* Muted, earthy green */
+    --accent-foreground: 140 50% 10%; /* Dark green for text on accent */
 
-    --destructive: 0 84.2% 60.2%; /* Default red */
+    --destructive: 0 84.2% 60.2%; /* Default red - kept from previous */
     --destructive-foreground: 0 0% 98%; /* Default light text on red */
 
-    --border: 210 20% 88%; /* Light gray-blue border */
-    --input: 210 30% 96%; /* Very light input background */
-    --ring: 205 70% 55%; /* Primary color for focus rings */
+    --border: 30 20% 88%; /* Soft, warm light grey border */
+    --input: 30 40% 97%; /* Very light warm cream for input */
+    --ring: 25 80% 60%; /* Primary color for focus rings */
 
     --radius: 0.75rem; /* Existing radius */
 
