@@ -9,34 +9,34 @@ body {
 
 @layer base {
   :root {
-    /* Warm & Inviting Palette */
-    --background: 30 50% 98%; /* Very light warm cream */
-    --foreground: 30 10% 25%; /* Dark, warm grey-brown */
+    /* New Palette based on #7F55B1 (Purple Primary) */
+    --background: 270 40% 98%; /* Very light, almost white lavender */
+    --foreground: 270 10% 20%; /* Dark, desaturated purple-grey */
 
     --card: 0 0% 100%; /* White - kept for contrast */
-    --card-foreground: 30 10% 25%; /* Same as main foreground */
+    --card-foreground: 270 10% 20%; /* Same as main foreground */
 
     --popover: 0 0% 100%; /* White */
-    --popover-foreground: 30 10% 25%;
+    --popover-foreground: 270 10% 20%;
 
-    --primary: 25 80% 60%; /* Warm, friendly orange */
-    --primary-foreground: 25 80% 10%; /* Dark brown for text on primary */
+    --primary: 270 38% 51%; /* #7F55B1 */
+    --primary-foreground: 270 30% 95%; /* Very light purple for text on primary */
 
-    --secondary: 30 30% 92%; /* Light, warm beige */
-    --secondary-foreground: 30 10% 30%; /* Slightly darker warm grey-brown */
+    --secondary: 270 30% 90%; /* Light lavender */
+    --secondary-foreground: 270 10% 30%; /* Darker purple-grey */
 
-    --muted: 30 40% 96%; /* Very light, warm beige */
-    --muted-foreground: 30 10% 45%; /* Soft, warm grey */
+    --muted: 270 35% 96%; /* Very light lavender, slightly more saturated than background */
+    --muted-foreground: 270 10% 45%; /* Medium purple-grey */
 
-    --accent: 140 40% 55%; /* Muted, earthy green */
-    --accent-foreground: 140 50% 10%; /* Dark green for text on accent */
+    --accent: 190 60% 55%; /* Medium bright teal for contrast */
+    --accent-foreground: 190 60% 15%; /* Dark teal for text on accent */
 
     --destructive: 0 84.2% 60.2%; /* Default red - kept from previous */
     --destructive-foreground: 0 0% 98%; /* Default light text on red */
 
-    --border: 30 20% 88%; /* Soft, warm light grey border */
-    --input: 30 40% 97%; /* Very light warm cream for input */
-    --ring: 25 80% 60%; /* Primary color for focus rings */
+    --border: 270 20% 85%; /* Light lavender-grey border */
+    --input: 270 30% 96%; /* Very light lavender for input */
+    --ring: 270 38% 51%; /* Primary color for focus rings */
 
     --radius: 0.75rem; /* Existing radius */
 
