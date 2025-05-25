@@ -31,15 +31,13 @@ import { Loader2, MapPin } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
-import type { LatLngExpression, LatLng } from 'leaflet'; // Keep type import
-// Removed: import L from 'leaflet'; // Ensure no top-level L import
+import type { LatLngExpression, LatLng, Icon as LeafletIconType, Map as LeafletMap } from 'leaflet';
 import dynamic from 'next/dynamic';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
 const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
 const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
-
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -52,9 +50,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Temporarily remove L and ActualDefaultIcon state and effect for diagnosis
-  // const [L, setL] = useState<typeof import('leaflet') | null>(null);
-  // const [ActualDefaultIcon, setActualDefaultIcon] = useState<LeafletIcon | null>(null);
+  const [L, setL] = useState<typeof import('leaflet') | null>(null);
+  const [ActualDefaultIcon, setActualDefaultIcon] = useState<typeof LeafletIconType.Default | null>(null);
+  const mapRefDialog = useRef<LeafletMap | null>(null);
+
 
   const restaurantReviewsQueryKey = ["reviews", restaurant.id];
   const userReviewedQueryKey = ["userReviewed", restaurant.id, user?.uid];
@@ -85,28 +84,16 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     staleTime: 5 * 60 * 1000,
   });
 
-  useEffect(() => {
+ useEffect(() => {
     if (isDialogOpen && typeof window !== 'undefined') {
-      setMapReadyDialog(true);
-      // Temporarily remove L and ActualDefaultIcon setup for diagnosis
-      // if (!L) {
-      //   import('leaflet').then(leafletModule => {
-      //     setL(leafletModule);
-      //     const icon = leafletModule.icon({
-      //       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-      //       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      //       iconSize: [25, 41],
-      //       iconAnchor: [12, 41],
-      //       popupAnchor: [1, -34],
-      //       shadowSize: [41, 41]
-      //     });
-      //     setActualDefaultIcon(icon);
-      //   });
-      // }
-    } else {
-        setMapReadyDialog(false);
+      import('leaflet').then(leafletModule => {
+        setL(leafletModule);
+        setActualDefaultIcon(() => leafletModule.Icon.Default);
+        setMapReadyDialog(true);
+      }).catch(error => console.error("Failed to load Leaflet for dialog map:", error));
+    } else if (!isDialogOpen) {
+        setMapReadyDialog(false); // Reset when dialog closes
     }
-  // }, [isDialogOpen, L]); // Removed L from dependencies for diagnosis
   }, [isDialogOpen]);
 
 
@@ -164,18 +151,30 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       if (firstCuisineId) {
         const cuisineForHint = allCuisines.find(c => c.id === firstCuisineId);
         if (cuisineForHint && cuisineForHint.name) {
-          return cuisineForHint.name.split(" ")[0].toLowerCase();
+          // Use first word of cuisine name as hint, or a default if too short/generic
+          const words = cuisineForHint.name.split(" ");
+          if (words.length > 0 && words[0].length > 2) {
+            return words[0].toLowerCase();
+          }
         }
       }
-      return "logo restaurante";
+      return "logo restaurante"; // Default placeholder hint
     }
-    return undefined;
+    return undefined; // No hint for user-uploaded images
   }, [restaurant.imageUrl, restaurant.cuisine]);
+
 
   const restaurantLocation: LatLngExpression | undefined =
     restaurant.latitude && restaurant.longitude
       ? [restaurant.latitude, restaurant.longitude]
       : undefined;
+
+  const markerIconInstance = useMemo(() => {
+    if (L && ActualDefaultIcon) {
+      return new ActualDefaultIcon({ imagePath: '/_next/static/media/' });
+    }
+    return undefined;
+  }, [L, ActualDefaultIcon]);
 
 
   return (
@@ -260,28 +259,27 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </div>
         </DialogHeader>
 
-        {isDialogOpen && mapReadyDialog && restaurantLocation && typeof window !== 'undefined' ? ( // Check isDialogOpen
+        {isDialogOpen && mapReadyDialog && restaurantLocation && L && ActualDefaultIcon && markerIconInstance ? (
           <div className="my-4">
             <MapContainer
               center={restaurantLocation}
               zoom={15}
               scrollWheelZoom={false}
               style={{ height: '200px', width: '100%', borderRadius: 'var(--radius)' }}
-              className="z-0"
+              whenCreated={mapInstance => { mapRefDialog.current = mapInstance; }}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              {/* Temporarily remove custom icon */}
-              <Marker position={restaurantLocation}>
+              <Marker position={restaurantLocation} icon={markerIconInstance}>
                 <Popup>{restaurant.name}</Popup>
               </Marker>
             </MapContainer>
           </div>
-        ) : isDialogOpen && mapReadyDialog && !restaurantLocation && typeof window !== 'undefined' ? (
+        ) : isDialogOpen && mapReadyDialog && !restaurantLocation ? (
             <p className="my-4 text-sm text-muted-foreground italic">La ubicación en el mapa no está disponible para este restaurante.</p>
-        ) : isDialogOpen && mapReadyDialog && typeof window !== 'undefined' ? ( // Loading state if map should be ready but L/Icon aren't
+        ) : isDialogOpen && mapReadyDialog ? (
           <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <p className="ml-2">Cargando mapa...</p>
@@ -374,5 +372,3 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
-
-    
