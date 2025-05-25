@@ -17,14 +17,13 @@ export interface Restaurant {
   name: string;
   imageUrl: string;
   description: string;
-  cuisine: string; // This will now be a value selected from the dropdown
+  cuisine: string[]; // Changed from string to string[]
   address: string;
   // Optional: add fields like createdAt if you store timestamps
-  // createdAt?: FirestoreTimestamp | number; 
+  // createdAt?: FirestoreTimestamp | number;
 }
 
 export interface Cuisine {
   id: string; // Corresponds to the document ID in Firestore
   name: string; // The display name of the cuisine
 }
-

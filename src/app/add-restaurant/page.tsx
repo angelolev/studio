@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,25 +13,32 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Restaurant } from '@/types';
 import { addRestaurantToFirestore } from '@/lib/firestoreService';
-import { cuisines } from '@/data/cuisines';
-import { Loader2, Camera, UploadCloud, Video, VideoOff } from 'lucide-react';
+import { cuisines as allCuisines } from '@/data/cuisines';
+import { Loader2, Camera, UploadCloud, Video, VideoOff, ChevronDown } from 'lucide-react';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB - Recommended to keep for uploads
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, { message: 'El nombre del restaurante debe tener al menos 2 caracteres.' }),
-  cuisine: z.string().min(1, { message: 'Por favor, selecciona una categoría.' }),
+  cuisine: z.array(z.string()).min(1, { message: 'Por favor, selecciona al menos una categoría.' }),
   address: z.string().min(5, { message: 'La dirección debe tener al menos 5 caracteres.' }),
   image: z
     .custom<File>()
-    .refine((file) => !!file, "Se requiere una imagen.") // Ensure image is present
+    .refine((file) => !!file, "Se requiere una imagen.")
     .refine((file) => file?.size <= MAX_FILE_SIZE, `El tamaño máximo del archivo es 5MB.`)
     .refine(
       (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type || ""),
@@ -57,16 +64,21 @@ export default function AddRestaurantPage() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
-
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
     defaultValues: {
       name: '',
-      cuisine: '',
+      cuisine: [],
       address: '',
       image: undefined,
     },
   });
+
+  const selectedCuisineNames = form.watch('cuisine').map(id => {
+    const cuisine = allCuisines.find(c => c.id === id);
+    return cuisine ? cuisine.name : id;
+  }).join(', ');
+
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -124,8 +136,6 @@ export default function AddRestaurantPage() {
       stream.getTracks().forEach(track => track.stop());
     }
     setIsCameraOpen(false);
-    // Do not set stream to null here, as it might be reused if permission was already granted
-    // setStream(null);
   };
 
   const capturePhoto = () => {
@@ -151,14 +161,12 @@ export default function AddRestaurantPage() {
   };
 
   useEffect(() => {
-    // Cleanup stream when component unmounts or if stream changes and is no longer needed
     return () => {
-      if (stream && !isCameraOpen) { // Only stop if camera isn't actively open
+      if (stream && !isCameraOpen) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
   }, [stream, isCameraOpen]);
-
 
   const mutation = useMutation({
     mutationFn: (data: { restaurantData: Omit<Restaurant, 'id' | 'imageUrl' | 'description'>, imageFile?: File }) =>
@@ -185,11 +193,9 @@ export default function AddRestaurantPage() {
   const onSubmit: SubmitHandler<AddRestaurantFormData> = (data) => {
     if (!user) return;
     const { image, ...restaurantData } = data;
-    
-    // Check if image is defined and is a File object
     const imageFile = image instanceof File ? image : undefined;
     
-    if (!imageFile && !imagePreview) { // If no file and no preview (e.g. from camera)
+    if (!imageFile && !imagePreview) {
         toast({
             title: "Imagen Requerida",
             description: "Por favor, toma una foto o sube una imagen para el restaurante.",
@@ -197,7 +203,6 @@ export default function AddRestaurantPage() {
         });
         return;
     }
-
     mutation.mutate({ restaurantData, imageFile });
   };
 
@@ -216,7 +221,6 @@ export default function AddRestaurantPage() {
     }
     setIsTakingPhoto(false);
   };
-
 
   if (loadingAuthState) {
     return (
@@ -267,25 +271,37 @@ export default function AddRestaurantPage() {
                 name="cuisine"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cocina / Categoría</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={"Selecciona una categoría"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {cuisines && cuisines.length > 0 ? (
-                          cuisines.map((cuisineItem) => (
-                            <SelectItem key={cuisineItem.id} value={cuisineItem.id}>
-                              {cuisineItem.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="disabled" disabled>No hay cocinas disponibles</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Cocina / Categorías</FormLabel>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <FormControl>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedCuisineNames || "Seleccionar categorías"}
+                            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-full max-h-60 overflow-y-auto">
+                        <DropdownMenuLabel>Tipos de Cocina</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {allCuisines.map((cuisineItem) => (
+                          <DropdownMenuCheckboxItem
+                            key={cuisineItem.id}
+                            checked={field.value?.includes(cuisineItem.id)}
+                            onCheckedChange={(checked) => {
+                              const currentValue = field.value || [];
+                              if (checked) {
+                                field.onChange([...currentValue, cuisineItem.id]);
+                              } else {
+                                field.onChange(currentValue.filter((id) => id !== cuisineItem.id));
+                              }
+                            }}
+                          >
+                            {cuisineItem.name}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -376,7 +392,7 @@ export default function AddRestaurantPage() {
                     <div className="mt-4">
                       <FormLabel>Vista Previa de la Imagen</FormLabel>
                       <div className="mt-2 relative w-full aspect-video rounded-md overflow-hidden border">
-                        <Image src={imagePreview} alt="Vista previa de la imagen" layout="fill" objectFit="cover" />
+                        <Image src={imagePreview} alt="Vista previa de la imagen" fill objectFit="cover" />
                       </div>
                     </div>
                   )}
@@ -400,5 +416,3 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
-
-    

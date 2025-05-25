@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Firebase Storage imports
 import { v4 as uuidv4 } from 'uuid';
+import { cuisines as allCuisinesStatic } from '@/data/cuisines'; // For description generation
 
 // --- Review Types and Functions ---
 export interface ReviewFirestoreData {
@@ -109,7 +110,7 @@ export async function checkIfUserReviewed(
 
 export interface RestaurantFirestoreData {
   name: string;
-  cuisine: string;
+  cuisine: string[]; // Changed from string to string[]
   address: string;
   imageUrl: string;
   description: string;
@@ -124,7 +125,6 @@ export async function addRestaurantToFirestore(
   let imageUrl = 'https://placehold.co/600x400.png'; // Default placeholder
 
   if (imageFile) {
-    // Use a unique name for the image file to prevent overwrites
     const imageName = `${uuidv4()}-${imageFile.name}`;
     const storageRef = ref(storage, `restaurant-images/${imageName}`);
     try {
@@ -132,18 +132,23 @@ export async function addRestaurantToFirestore(
       imageUrl = await getDownloadURL(snapshot.ref);
     } catch (error) {
       console.error("Error uploading image to Firebase Storage: ", error);
-      // Optionally, re-throw or handle the error (e.g., by still using placeholder)
-      // For now, if upload fails, it will still use the placeholder.
       throw new Error("Error al subir la imagen. Por favor, intenta de nuevo.");
     }
   }
 
+  const cuisineNames = restaurantData.cuisine.map(cId => {
+    const foundCuisine = allCuisinesStatic.find(c => c.id === cId);
+    return foundCuisine ? foundCuisine.name : cId;
+  }).join(' y ');
+
+  const description = `Un restaurante especializado en ${cuisineNames}, ubicado en ${restaurantData.address}.`;
+
   const docData: RestaurantFirestoreData = {
     name: restaurantData.name,
-    cuisine: restaurantData.cuisine,
+    cuisine: restaurantData.cuisine, // Now an array
     address: restaurantData.address,
     imageUrl: imageUrl,
-    description: `Un restaurante especializado en ${restaurantData.cuisine}, ubicado en ${restaurantData.address}.`,
+    description: description,
     createdAt: serverTimestamp(),
   };
 
@@ -152,7 +157,7 @@ export async function addRestaurantToFirestore(
   return {
     id: docRef.id,
     name: restaurantData.name,
-    cuisine: restaurantData.cuisine,
+    cuisine: restaurantData.cuisine, // Returns the array
     address: restaurantData.address,
     imageUrl: docData.imageUrl,
     description: docData.description,
@@ -161,16 +166,16 @@ export async function addRestaurantToFirestore(
 
 export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]> {
   const restaurantColRef = collection(db, "restaurants");
-  const q = query(restaurantColRef, orderBy("createdAt", "desc")); // Order by creation time
+  const q = query(restaurantColRef, orderBy("createdAt", "desc"));
 
   const querySnapshot = await getDocs(q);
 
   return querySnapshot.docs.map((doc) => {
-    const data = doc.data() as RestaurantFirestoreData;
+    const data = doc.data() as RestaurantFirestoreData; // Firestore data will have cuisine as string[]
     return {
       id: doc.id,
       name: data.name,
-      cuisine: data.cuisine,
+      cuisine: data.cuisine, // cuisine is already string[]
       address: data.address,
       imageUrl: data.imageUrl,
       description: data.description,

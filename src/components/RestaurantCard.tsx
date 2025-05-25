@@ -53,11 +53,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   } = useQuery<ReviewWithNumericTimestamp[], Error, AppReviewType[]>({
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
+    enabled: true, // Fetch reviews when card mounts
     select: (data) =>
       data.map((review) => ({
         ...review,
-        timestamp: review.timestamp, // Already a number
+        timestamp: review.timestamp,
       })),
   });
 
@@ -111,24 +112,25 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     isLoadingUserReviewedCheck,
   ]);
 
-  const cuisineName = useMemo(() => {
-    const foundCuisine = allCuisines.find((c) => c.id === restaurant.cuisine);
-    return foundCuisine ? foundCuisine.name : restaurant.cuisine;
+  const cuisineNames = useMemo(() => {
+    if (!restaurant.cuisine || restaurant.cuisine.length === 0) return "N/A";
+    return restaurant.cuisine.map(cId => {
+      const foundCuisine = allCuisines.find(c => c.id === cId);
+      return foundCuisine ? foundCuisine.name : cId;
+    }).join(', ');
   }, [restaurant.cuisine]);
 
   const imageHint = useMemo(() => {
     if (restaurant.imageUrl && restaurant.imageUrl.startsWith("https://placehold.co")) {
-      const cuisineForHint = allCuisines.find(
-        (c) => c.id === restaurant.cuisine
-      );
-      if (cuisineForHint && cuisineForHint.name) {
-        return cuisineForHint.name.split(" ")[0].toLowerCase();
+      const firstCuisineId = restaurant.cuisine?.[0];
+      if (firstCuisineId) {
+        const cuisineForHint = allCuisines.find(c => c.id === firstCuisineId);
+        if (cuisineForHint && cuisineForHint.name) {
+          return cuisineForHint.name.split(" ")[0].toLowerCase();
+        }
       }
       return "logo restaurante";
     }
-    // If it's a user-uploaded image (not a placeholder), we might not need a generic hint,
-    // or we could derive it from the restaurant name if desired.
-    // For now, no hint for non-placeholder images.
     return undefined;
   }, [restaurant.imageUrl, restaurant.cuisine]);
 
@@ -154,7 +156,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               width={64}
               height={64}
               className="rounded-md object-cover aspect-square"
-              data-ai-hint={imageHint} // Keep this if you have a system using it
+              data-ai-hint={imageHint}
             />
           </div>
 
@@ -167,9 +169,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             </h3>
             <p
               className="text-xs sm:text-sm text-muted-foreground truncate"
-              title={cuisineName}
+              title={cuisineNames}
             >
-              {cuisineName}
+              {cuisineNames}
             </p>
           </div>
           
@@ -192,7 +194,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         <DialogHeader>
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
           <DialogDescription className="text-base">
-             {cuisineName}
+             {cuisineNames}
           </DialogDescription>
           <div className="flex items-center text-sm text-muted-foreground mt-1">
             <MapPin size={14} className="mr-1.5 shrink-0" />
