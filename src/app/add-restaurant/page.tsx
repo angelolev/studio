@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -11,10 +12,10 @@ import Image from "next/image";
 import type {
   LatLngExpression,
   LatLng,
-  // Icon as LeafletIconType, // Not needed if using L.Icon.Default
+  Icon as LeafletIconType,
   Map as LeafletMapType,
 } from "leaflet";
-import type leaflet from "leaflet";
+import type leaflet from "leaflet"; // For L type
 import dynamic from "next/dynamic";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -79,24 +80,18 @@ const LeafletPopup = dynamic(
   { ssr: false }
 );
 
-// Create a dynamic component that includes useMapEvents
 const MapEventsComponent = dynamic(
   () =>
     import("react-leaflet").then((mod) => {
       const { useMapEvents } = mod;
-
       return function MapEvents({
         onMapClick,
-        L,
       }: {
         onMapClick: (latlng: LatLng) => void;
-        L: typeof leaflet | null;
       }) {
         useMapEvents({
           click(e) {
-            if (!L) return;
-            const newPosition = e.latlng as LatLng;
-            onMapClick(newPosition);
+            onMapClick(e.latlng as LatLng);
           },
         });
         return null;
@@ -104,6 +99,7 @@ const MapEventsComponent = dynamic(
     }),
   { ssr: false }
 );
+
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
@@ -149,41 +145,21 @@ const addRestaurantSchema = z.object({
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
 
 interface LocationMarkerProps {
-  onPositionChange: (latlng: LatLng) => void;
-  initialPosition?: LatLng | null;
-  L: typeof leaflet | null;
-  // ConfiguredIcon prop is removed; LocationMarker will use L.Icon.Default if L is available
+  position: LatLng | null;
+  icon: LeafletIconType | null;
 }
 
-function LocationMarker({
-  onPositionChange,
-  initialPosition,
-  L,
-}: LocationMarkerProps) {
-  const [markerPosition, setMarkerPosition] = useState<LatLng | null>(
-    initialPosition || null
-  );
-
-  useEffect(() => {
-    if (initialPosition) {
-      setMarkerPosition(initialPosition);
-    } else {
-      setMarkerPosition(null);
-    }
-  }, [initialPosition]);
-
-  if (!L || !markerPosition || !LeafletMarker || !LeafletPopup) {
+function LocationMarker({ position, icon }: LocationMarkerProps) {
+  if (!position || !icon || !LeafletMarker || !LeafletPopup) {
     return null;
   }
-  // Directly use L.Icon.Default assuming it's configured globally
-  const icon = new L.Icon.Default();
-
   return (
-    <LeafletMarker position={markerPosition} icon={icon}>
+    <LeafletMarker position={position} icon={icon}>
       <LeafletPopup>Has seleccionado esta ubicación</LeafletPopup>
     </LeafletMarker>
   );
 }
+
 
 export default function AddRestaurantPage() {
   const { user, loadingAuthState } = useAuth();
@@ -199,6 +175,8 @@ export default function AddRestaurantPage() {
     DEFAULT_MAP_CENTER_LIMA
   );
   const mapRef = useRef<LeafletMapType | null>(null);
+  const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(null);
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -243,6 +221,7 @@ export default function AddRestaurantPage() {
             (leafletModule.Icon.Default.prototype as any)._iconInit = true;
           }
           setL(leafletModule);
+          setMapMarkerIcon(new leafletModule.Icon.Default());
           setIsLeafletConfigured(true);
         })
         .catch((err) =>
@@ -252,7 +231,7 @@ export default function AddRestaurantPage() {
     return () => {
       isMounted = false;
     };
-  }, [isLeafletConfigured]); // Only re-run if isLeafletConfigured changes (e.g. from false to true)
+  }, [isLeafletConfigured]);
 
   useEffect(() => {
     if (isLeafletConfigured) {
@@ -464,7 +443,6 @@ export default function AddRestaurantPage() {
 
   const centerMapOnUser = () => {
     if (!L || !isLeafletConfigured) {
-      // Check isLeafletConfigured
       toast({
         title: "Mapa no listo",
         description: "Por favor, espera a que el mapa cargue.",
@@ -481,9 +459,9 @@ export default function AddRestaurantPage() {
           );
           form.setValue("latitude", userLatLng.lat, { shouldValidate: true });
           form.setValue("longitude", userLatLng.lng, { shouldValidate: true });
-          setSelectedMapPosition(userLatLng);
+          setSelectedMapPosition(userLatLng); // This should update the marker via LocationMarker
           if (mapRef.current) {
-            mapRef.current.flyTo(userLatLng, 18);
+            mapRef.current.flyTo(userLatLng, 18); // Zoom in when centering on user
           }
         },
         (error) => {
@@ -635,7 +613,7 @@ export default function AddRestaurantPage() {
                         size="sm"
                         onClick={centerMapOnUser}
                         className="gap-1.5"
-                        disabled={!isLeafletConfigured} // Disable if Leaflet not ready
+                        disabled={!isLeafletConfigured}
                       >
                         <LocateFixed size={16} />
                         Usar mi ubicación
@@ -645,11 +623,7 @@ export default function AddRestaurantPage() {
                       Haz clic en el mapa para seleccionar la ubicación del
                       restaurante.
                     </FormDescription>
-                    {mapReady &&
-                    LeafletMapContainer &&
-                    LeafletTileLayer &&
-                    L &&
-                    isLeafletConfigured ? (
+                    {mapReady && LeafletMapContainer && LeafletTileLayer && L && mapMarkerIcon ? (
                       <LeafletMapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
@@ -680,24 +654,9 @@ export default function AddRestaurantPage() {
                                 shouldValidate: true,
                               });
                             }}
-                            L={L}
                           />
                         )}
-                        {selectedMapPosition && (
-                          <LocationMarker
-                            onPositionChange={(latlng) => {
-                              setSelectedMapPosition(latlng);
-                              form.setValue("latitude", latlng.lat, {
-                                shouldValidate: true,
-                              });
-                              form.setValue("longitude", latlng.lng, {
-                                shouldValidate: true,
-                              });
-                            }}
-                            initialPosition={selectedMapPosition}
-                            L={L}
-                          />
-                        )}
+                        <LocationMarker position={selectedMapPosition} icon={mapMarkerIcon} />
                       </LeafletMapContainer>
                     ) : (
                       <div className="h-[300px] w-full flex items-center justify-center bg-muted rounded-md">
@@ -816,10 +775,8 @@ export default function AddRestaurantPage() {
                               className="sr-only"
                               accept={ACCEPTED_IMAGE_TYPES.join(",")}
                               ref={(instance) => {
-                                fileUploadInputRef.current = instance;
-                                if (typeof imageField.ref === "function") {
-                                  imageField.ref(instance);
-                                }
+                                imageField.ref(instance); // From react-hook-form
+                                fileUploadInputRef.current = instance; // For programmatic click
                               }}
                               onChange={(e) => {
                                 handleImageFileChange(e);
