@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -13,10 +14,8 @@ import type {
   LatLng,
   Map as LeafletMapType,
   Icon as LeafletIconType,
-} from "leaflet"; // Type imports are fine
-
+} from "leaflet";
 import dynamic from "next/dynamic";
-import { configureLeafletDefaultIcon } from "@/lib/leaflet-config"; // Import the configuration function
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +49,7 @@ import {
   ArrowLeft,
   LocateFixed,
 } from "lucide-react";
+import { configureLeafletDefaultIcon } from "@/lib/leaflet-config";
 
 const LeafletMapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
@@ -67,11 +67,11 @@ const LeafletTileLayer = dynamic(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
   { ssr: false }
 );
-const LeafletMarker = dynamic(
+const DynamicLeafletMarker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
   { ssr: false }
 );
-const LeafletPopup = dynamic(
+const DynamicLeafletPopup = dynamic(
   () => import("react-leaflet").then((mod) => mod.Popup),
   { ssr: false }
 );
@@ -79,13 +79,11 @@ const LeafletPopup = dynamic(
 interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
-  icon: LeafletIconType | null; // Expect an icon instance
-  // Dynamically imported components
-  MarkerComponent: typeof LeafletMarker | null;
-  PopupComponent: typeof LeafletPopup | null;
+  icon: LeafletIconType | null;
+  MarkerComponent: typeof DynamicLeafletMarker | null;
+  PopupComponent: typeof DynamicLeafletPopup | null;
 }
 
-// Define LocationMarker outside AddRestaurantPage
 function LocationMarker({
   position,
   onMapClick,
@@ -93,7 +91,7 @@ function LocationMarker({
   MarkerComponent,
   PopupComponent,
 }: LocationMarkerProps) {
-  const { useMapEvents } = require("react-leaflet"); // Keep dynamic require here
+  const { useMapEvents } = require("react-leaflet");
 
   useMapEvents({
     click(e) {
@@ -120,7 +118,7 @@ const ACCEPTED_IMAGE_TYPES = [
 ];
 
 const DEFAULT_MAP_CENTER_LIMA: LatLngExpression = [-12.046374, -77.042793];
-const DEFAULT_MAP_ZOOM = 17;
+const DEFAULT_MAP_ZOOM = 15;
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, {
@@ -175,12 +173,14 @@ export default function AddRestaurantPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileUploadInputRef = useRef<HTMLInputElement | null>(null);
+
   const [hasCameraPermission, setHasCameraPermission] = useState<
     boolean | null
   >(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [currentStream, setCurrentStream] = useState<MediaStream | null>(null);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+
   const [selectedMapPosition, setSelectedMapPosition] = useState<LatLng | null>(
     null
   );
@@ -196,21 +196,17 @@ export default function AddRestaurantPage() {
   });
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !mapReady) {
-      // Only run if map not ready
+    if (!mapReady) {
       import("leaflet")
         .then((leafletModule) => {
-          configureLeafletDefaultIcon(leafletModule); // Configure prototype
-          const icon = new leafletModule.Icon.Default(); // Create instance from configured prototype
+          configureLeafletDefaultIcon(leafletModule);
+          const icon = new leafletModule.Icon.Default();
           setL(leafletModule);
           setMapMarkerIcon(icon);
           setMapReady(true);
         })
         .catch((error) => {
-          console.error(
-            "Failed to load Leaflet module for AddRestaurantPage",
-            error
-          );
+          console.error("Failed to load Leaflet module", error);
           toast({
             title: "Error de Mapa",
             description: "No se pudo cargar el módulo del mapa.",
@@ -218,17 +214,10 @@ export default function AddRestaurantPage() {
           });
         });
     }
-  }, [mapReady, toast]); // Run when mapReady changes (initially false) or on first client render
+  }, [mapReady, toast]);
 
   useEffect(() => {
-    if (
-      mapReady &&
-      L &&
-      navigator.geolocation &&
-      form &&
-      !form.getValues("latitude") &&
-      !form.getValues("longitude")
-    ) {
+    if (mapReady && L && navigator.geolocation && form && !form.getValues("latitude") && !form.getValues("longitude")) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const userLatLng = L.latLng(
@@ -251,6 +240,7 @@ export default function AddRestaurantPage() {
     }
   }, [mapReady, L, form]);
 
+
   useEffect(() => {
     if (!loadingAuthState && !user) {
       toast({
@@ -262,7 +252,7 @@ export default function AddRestaurantPage() {
     }
   }, [user, loadingAuthState, router, toast]);
 
-  const getCameraPermission = async () => {
+  const requestCameraAccess = async (): Promise<MediaStream | null> => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       toast({
         variant: "destructive",
@@ -271,49 +261,60 @@ export default function AddRestaurantPage() {
       });
       setHasCameraPermission(false);
       setIsCameraOpen(false);
-      return;
+      setIsTakingPhoto(false);
+      return null;
     }
+
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      const newStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
-      setStream(mediaStream);
       setHasCameraPermission(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
+      return newStream;
     } catch (error) {
       console.error("Error accessing camera:", error);
       setHasCameraPermission(false);
       setIsCameraOpen(false);
+      setIsTakingPhoto(false);
       toast({
         variant: "destructive",
         title: "Acceso a Cámara Denegado",
         description:
           "Por favor, habilita los permisos de cámara en tu navegador o la cámara seleccionada no está disponible.",
       });
+      return null;
     }
   };
 
   const openCamera = async () => {
     setIsTakingPhoto(true);
     setIsCameraOpen(true);
-    if (hasCameraPermission === null || hasCameraPermission === false) {
-      await getCameraPermission();
-    } else if (hasCameraPermission === true && stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
+
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+      setCurrentStream(null);
+    }
+
+    const newStream = await requestCameraAccess();
+    if (newStream) {
+      setCurrentStream(newStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+        videoRef.current.play().catch(err => console.error("Error playing video:", err));
+      }
     }
   };
 
   const closeCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
+    if (currentStream) {
+      currentStream.getTracks().forEach((track) => track.stop());
+      setCurrentStream(null);
     }
     setIsCameraOpen(false);
   };
 
   const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current && currentStream) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
@@ -339,12 +340,14 @@ export default function AddRestaurantPage() {
   };
 
   useEffect(() => {
+    const streamToClean = currentStream;
     return () => {
-      if (stream && !isCameraOpen) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (streamToClean) {
+        streamToClean.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [stream, isCameraOpen]);
+  }, [currentStream]);
+
 
   const mutation = useMutation({
     mutationFn: (data: {
@@ -623,8 +626,8 @@ export default function AddRestaurantPage() {
                     mapMarkerIcon &&
                     LeafletMapContainer &&
                     LeafletTileLayer &&
-                    LeafletMarker &&
-                    LeafletPopup ? (
+                    DynamicLeafletMarker &&
+                    DynamicLeafletPopup ? (
                       <LeafletMapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
@@ -645,8 +648,8 @@ export default function AddRestaurantPage() {
                           position={selectedMapPosition}
                           onMapClick={handleMapClick}
                           icon={mapMarkerIcon}
-                          MarkerComponent={LeafletMarker}
-                          PopupComponent={LeafletPopup}
+                          MarkerComponent={DynamicLeafletMarker}
+                          PopupComponent={DynamicLeafletPopup}
                         />
                       </LeafletMapContainer>
                     ) : (
@@ -697,18 +700,16 @@ export default function AddRestaurantPage() {
                       className="w-full h-full object-cover"
                       autoPlay
                       muted
-                      playsInline
+                      playsInline // Important for iOS
                     />
-                    {hasCameraPermission === false && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
-                        <Alert variant="destructive">
+                    {hasCameraPermission === false && ( // Show if explicitly denied or error
+                        <Alert variant="destructive" className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
                           <VideoOff className="mr-2 h-5 w-5" />
                           <AlertTitle>Acceso a Cámara Denegado</AlertTitle>
                           <AlertDescription>
                             Revisa los permisos de cámara de tu navegador.
                           </AlertDescription>
                         </Alert>
-                      </div>
                     )}
                   </div>
                   <canvas ref={canvasRef} className="hidden"></canvas>
@@ -717,7 +718,8 @@ export default function AddRestaurantPage() {
                       type="button"
                       onClick={capturePhoto}
                       className="w-full"
-                      disabled={hasCameraPermission === false}
+                      disabled={hasCameraPermission !== true || !currentStream}
+                      variant="outline"
                     >
                       <Camera className="mr-2 h-4 w-4" /> Capturar Foto
                     </Button>
@@ -742,7 +744,7 @@ export default function AddRestaurantPage() {
                     render={({ field: imageField }) => (
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
-                        <div className="flex sm:flex-row gap-2">
+                        <div className="flex sm:flex-row flex-col gap-2">
                           <Button
                             type="button"
                             onClick={openCamera}
@@ -811,7 +813,6 @@ export default function AddRestaurantPage() {
                 type="submit"
                 className="w-full"
                 disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
-                variant="outline"
               >
                 {mutation.isPending ? (
                   <>
@@ -829,3 +830,4 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
+
