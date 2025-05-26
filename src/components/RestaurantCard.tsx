@@ -31,16 +31,11 @@ import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
 
+import L from '@/lib/leaflet-config'; // Import pre-configured L
 import type {
   LatLngExpression,
-  Icon as LeafletIconType,
   Map as LeafletMapType,
 } from "leaflet";
-// Marker images are imported but L.Icon.Default prototype won't be modified.
-// They will be used for direct L.Icon creation.
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 import dynamic from "next/dynamic";
 
@@ -60,11 +55,11 @@ const LeafletTileLayer = dynamic(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
   { ssr: false }
 );
-const LeafletMarker = dynamic(
+const DynamicLeafletMarkerDialog = dynamic( // Renamed for clarity
   () => import("react-leaflet").then((mod) => mod.Marker),
   { ssr: false }
 );
-const LeafletPopup = dynamic(
+const DynamicLeafletPopupDialog = dynamic( // Renamed for clarity
   () => import("react-leaflet").then((mod) => mod.Popup),
   { ssr: false }
 );
@@ -78,12 +73,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  const [L, setL] = useState<typeof import("leaflet") | null>(null);
-  const [markerIconInstance, setMarkerIconInstance] = useState<LeafletIconType | null>(null);
+  
   const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const mapRefDialog = useRef<LeafletMapType | null>(null);
-
 
   const restaurantReviewsQueryKey = ["reviews", restaurant.id];
   const userReviewedQueryKey = ["userReviewed", restaurant.id, user?.uid];
@@ -115,42 +107,22 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   });
 
   useEffect(() => {
-    if (isDialogOpen && !L) { // Only run if dialog is open and L is not already set
-      import("leaflet").then((leafletModule) => {
-        setL(leafletModule);
-         // Create the icon instance directly with all options
-        const icon = new leafletModule.Icon({
-            iconUrl: markerIcon.src,
-            iconRetinaUrl: markerIcon2x.src,
-            shadowUrl: markerShadow.src,
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41],
-        });
-        setMarkerIconInstance(icon);
-        setMapReadyDialog(true);
-      }).catch((err) => {
-        console.error("Error loading Leaflet module in RestaurantCard:", err);
-        setMapReadyDialog(false); // Ensure mapReadyDialog is false on error
-      });
-    } else if (isDialogOpen && L && markerIconInstance) {
-        setMapReadyDialog(true); // L and icon already exist, just set map ready
+    // L is pre-configured by importing from leaflet-config.ts
+    // We just need to ensure react-leaflet components are ready for the dialog
+    if (isDialogOpen && typeof window !== 'undefined') {
+        setMapReadyDialog(true); // Assume map is ready for dialog if client-side
     } else if (!isDialogOpen) {
       if (mapRefDialog.current && typeof (mapRefDialog.current as any).remove === 'function') {
         try {
           (mapRefDialog.current as any).remove();
         } catch (e) {
-          console.error("Error removing map instance in RestaurantCard:", e);
+          console.error("Error removing dialog map instance:", e);
         }
       }
       mapRefDialog.current = null;
       setMapReadyDialog(false);
-      // Optionally reset L and markerIconInstance if they should be reloaded per dialog opening
-      // setL(null); 
-      // setMarkerIconInstance(null);
     }
-  }, [isDialogOpen, L, markerIconInstance]);
+  }, [isDialogOpen]);
 
 
   useEffect(() => {
@@ -311,7 +283,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </div>
         </DialogHeader>
 
-        {isDialogOpen && mapReadyDialog && restaurantLocation && L && markerIconInstance && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
+        {isDialogOpen && mapReadyDialog && restaurantLocation && LeafletMapContainer && LeafletTileLayer && DynamicLeafletMarkerDialog && DynamicLeafletPopupDialog ? (
           <div className="my-4">
             <LeafletMapContainer
               key={restaurant.id + (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")}
@@ -329,12 +301,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <LeafletMarker
+              {/* Rely on globally configured default icon from leaflet-config.ts */}
+              <DynamicLeafletMarkerDialog
                 position={restaurantLocation}
-                icon={markerIconInstance}
               >
-                <LeafletPopup>{restaurant.name}</LeafletPopup>
-              </LeafletMarker>
+                <DynamicLeafletPopupDialog>{restaurant.name}</DynamicLeafletPopupDialog>
+              </DynamicLeafletMarkerDialog>
             </LeafletMapContainer>
             <Button
               variant="outline"
@@ -348,7 +320,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               Obtener Direcciones
             </Button>
           </div>
-        ) : isDialogOpen && !mapReadyDialog && restaurantLocation && L ? (
+        ) : isDialogOpen && !mapReadyDialog && restaurantLocation ? ( 
           <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <p className="ml-2">Cargando mapa...</p>
@@ -445,5 +417,3 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
-
-    
