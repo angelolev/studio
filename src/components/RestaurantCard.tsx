@@ -450,7 +450,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             user &&
             !isLoadingUserReviewedCheck &&
             showReviewForm && (
-              <div>
+              <div className="px-1">
                 <h3 className="text-lg font-semibold mb-3 text-foreground">
                   Deja tu Opinión
                 </h3>
@@ -472,8 +472,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             )}
         </div>
         <DialogFooter className="mt-auto pt-4 border-t">
-          <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-            Cerrar
+          <Button
+            variant="outline"
+            onClick={() => setIsDialogOpen(false)}
+            style={{ backgroundColor: "#e74c3c" }}
+          >
+            Cancelar
           </Button>
         </DialogFooter>
       </DialogContent>

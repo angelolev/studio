@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm, SubmitHandler } from "react-hook-form";
@@ -166,7 +165,7 @@ export default function ReviewForm({
                   placeholder="Cuéntanos sobre tu experiencia..."
                   {...field}
                   rows={4}
-                  className="bg-card focus-visible:border-primary"
+                  className="bg-card"
                 />
               </FormControl>
               <FormMessage />
@@ -177,6 +176,7 @@ export default function ReviewForm({
           type="submit"
           className="w-full sm:w-auto"
           disabled={addReviewMutation.isPending}
+          variant="outline"
         >
           {addReviewMutation.isPending ? (
             <>
