@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -79,8 +78,30 @@ const LeafletPopup = dynamic(
   () => import("react-leaflet").then((mod) => mod.Popup),
   { ssr: false }
 );
-const useMapEvents = dynamic(
-  () => import("react-leaflet").then((mod) => mod.useMapEvents),
+
+// Create a dynamic component that includes useMapEvents
+const MapEventsComponent = dynamic(
+  () =>
+    import("react-leaflet").then((mod) => {
+      const { useMapEvents } = mod;
+
+      return function MapEvents({
+        onMapClick,
+        L,
+      }: {
+        onMapClick: (latlng: LatLng) => void;
+        L: typeof leaflet | null;
+      }) {
+        useMapEvents({
+          click(e) {
+            if (!L) return;
+            const newPosition = e.latlng as LatLng;
+            onMapClick(newPosition);
+          },
+        });
+        return null;
+      };
+    }),
   { ssr: false }
 );
 
@@ -142,18 +163,6 @@ function LocationMarker({
   const [markerPosition, setMarkerPosition] = useState<LatLng | null>(
     initialPosition || null
   );
-  const MapEventsHook = useMapEvents;
-
-  MapEventsHook
-    ? MapEventsHook({
-        click(e) {
-          if (!L) return;
-          const newPosition = e.latlng as LatLng;
-          setMarkerPosition(newPosition);
-          onPositionChange(newPosition);
-        },
-      })
-    : null;
 
   useEffect(() => {
     if (initialPosition) {
@@ -217,24 +226,28 @@ export default function AddRestaurantPage() {
   useEffect(() => {
     let isMounted = true;
     if (!isLeafletConfigured) {
-      import("leaflet").then((leafletModule) => {
-        if (!isMounted) return;
-        if (!leafletModule.Icon.Default.prototype._iconInit) {
-          delete (leafletModule.Icon.Default.prototype as any)._getIconUrl;
-          leafletModule.Icon.Default.mergeOptions({
-            iconRetinaUrl: markerIcon2x.src,
-            iconUrl: markerIcon.src,
-            shadowUrl: markerShadow.src,
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41],
-          });
-          leafletModule.Icon.Default.prototype._iconInit = true;
-        }
-        setL(leafletModule);
-        setIsLeafletConfigured(true);
-      }).catch(err => console.error("Error loading Leaflet in AddRestaurantPage:", err));
+      import("leaflet")
+        .then((leafletModule) => {
+          if (!isMounted) return;
+          if (!(leafletModule.Icon.Default.prototype as any)._iconInit) {
+            delete (leafletModule.Icon.Default.prototype as any)._getIconUrl;
+            leafletModule.Icon.Default.mergeOptions({
+              iconRetinaUrl: markerIcon2x.src,
+              iconUrl: markerIcon.src,
+              shadowUrl: markerShadow.src,
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41],
+            });
+            (leafletModule.Icon.Default.prototype as any)._iconInit = true;
+          }
+          setL(leafletModule);
+          setIsLeafletConfigured(true);
+        })
+        .catch((err) =>
+          console.error("Error loading Leaflet in AddRestaurantPage:", err)
+        );
     }
     return () => {
       isMounted = false;
@@ -249,7 +262,10 @@ export default function AddRestaurantPage() {
 
   useEffect(() => {
     if (mapReady && L && navigator.geolocation) {
-      if (form.getValues("latitude") === undefined && form.getValues("longitude") === undefined) {
+      if (
+        form.getValues("latitude") === undefined &&
+        form.getValues("longitude") === undefined
+      ) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const userLatLng = L.latLng(
@@ -265,7 +281,7 @@ export default function AddRestaurantPage() {
             console.warn(`Error obteniendo geolocalización: ${error.message}`);
             setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
             if (mapRef.current) {
-                 mapRef.current.flyTo(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
+              mapRef.current.flyTo(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
             }
           },
           { timeout: 10000 }
@@ -447,8 +463,13 @@ export default function AddRestaurantPage() {
   };
 
   const centerMapOnUser = () => {
-    if (!L || !isLeafletConfigured) { // Check isLeafletConfigured
-      toast({ title: "Mapa no listo", description: "Por favor, espera a que el mapa cargue.", variant: "default" });
+    if (!L || !isLeafletConfigured) {
+      // Check isLeafletConfigured
+      toast({
+        title: "Mapa no listo",
+        description: "Por favor, espera a que el mapa cargue.",
+        variant: "default",
+      });
       return;
     }
     if (navigator.geolocation) {
@@ -468,7 +489,8 @@ export default function AddRestaurantPage() {
         (error) => {
           toast({
             title: "Error de Geolocalización",
-            description: "No se pudo obtener tu ubicación actual. " + error.message,
+            description:
+              "No se pudo obtener tu ubicación actual. " + error.message,
             variant: "destructive",
           });
         },
@@ -623,23 +645,45 @@ export default function AddRestaurantPage() {
                       Haz clic en el mapa para seleccionar la ubicación del
                       restaurante.
                     </FormDescription>
-                    {mapReady && LeafletMapContainer && LeafletTileLayer && L && isLeafletConfigured ? (
+                    {mapReady &&
+                    LeafletMapContainer &&
+                    LeafletTileLayer &&
+                    L &&
+                    isLeafletConfigured ? (
                       <LeafletMapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
-                        scrollWheelZoom={true}
                         style={{
                           height: "300px",
                           width: "100%",
-                          borderRadius: "var(--radius)",
+                          borderRadius: "6px",
                         }}
-                        whenCreated={(mapInstance) => { mapRef.current = mapInstance; }}
+                        scrollWheelZoom={true}
+                        ref={(mapInstance: LeafletMapType | null) => {
+                          if (mapInstance) {
+                            mapRef.current = mapInstance;
+                          }
+                        }}
                       >
                         <LeafletTileLayer
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
-                        {MapEventsHook && (
+                        {MapEventsComponent && (
+                          <MapEventsComponent
+                            onMapClick={(latlng) => {
+                              setSelectedMapPosition(latlng);
+                              form.setValue("latitude", latlng.lat, {
+                                shouldValidate: true,
+                              });
+                              form.setValue("longitude", latlng.lng, {
+                                shouldValidate: true,
+                              });
+                            }}
+                            L={L}
+                          />
+                        )}
+                        {selectedMapPosition && (
                           <LocationMarker
                             onPositionChange={(latlng) => {
                               setSelectedMapPosition(latlng);
@@ -666,9 +710,12 @@ export default function AddRestaurantPage() {
                         {latitudeFieldState.error.message}
                       </FormMessage>
                     )}
-                    {form.formState.errors.longitude && !latitudeFieldState.error && (
-                       <FormMessage>{form.formState.errors.longitude.message}</FormMessage>
-                    )}
+                    {form.formState.errors.longitude &&
+                      !latitudeFieldState.error && (
+                        <FormMessage>
+                          {form.formState.errors.longitude.message}
+                        </FormMessage>
+                      )}
                   </FormItem>
                 )}
               />
@@ -742,9 +789,7 @@ export default function AddRestaurantPage() {
                   <FormField
                     control={form.control}
                     name="image"
-                    render={(
-                      { field: imageField }
-                    ) => (
+                    render={({ field: imageField }) => (
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -779,8 +824,10 @@ export default function AddRestaurantPage() {
                               onChange={(e) => {
                                 handleImageFileChange(e);
                                 if (typeof imageField.onChange === "function") {
-                                   const files = e.target.files;
-                                   imageField.onChange(files ? files[0] : undefined);
+                                  const files = e.target.files;
+                                  imageField.onChange(
+                                    files ? files[0] : undefined
+                                  );
                                 }
                               }}
                               onBlur={imageField.onBlur}
