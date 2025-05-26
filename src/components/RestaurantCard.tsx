@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Image from "next/image";
 import type { Restaurant } from "@/types";
 import type { Review as AppReviewType } from "@/types";
@@ -81,10 +81,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const [L, setL] = useState<typeof leaflet | null>(null);
+  const [markerIconInstance, setMarkerIconInstance] = useState<LeafletIconType | null>(null);
   const [isLeafletCoreConfigured, setIsLeafletCoreConfigured] = useState(false);
   const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const mapRefDialog = useRef<LeafletMapType | null>(null);
-  const [markerIconInstance, setMarkerIconInstance] = useState<LeafletIconType | null>(null);
 
 
   const restaurantReviewsQueryKey = ["reviews", restaurant.id];
@@ -117,36 +117,28 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   });
 
   useEffect(() => {
-    let isMounted = true;
-    if (isDialogOpen && !isLeafletCoreConfigured) {
-      import("leaflet")
-        .then((leafletModule) => {
-          if (!isMounted) return;
-          if (!(leafletModule.Icon.Default.prototype as any)._iconInit) {
-            delete (leafletModule.Icon.Default.prototype as any)._getIconUrl;
-            leafletModule.Icon.Default.mergeOptions({
-              iconRetinaUrl: markerIcon2x.src,
-              iconUrl: markerIcon.src,
-              shadowUrl: markerShadow.src,
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41],
-            });
-            (leafletModule.Icon.Default.prototype as any)._iconInit = true;
-          }
-          setL(leafletModule);
-          setMarkerIconInstance(new leafletModule.Icon.Default());
-          setIsLeafletCoreConfigured(true); 
-        })
-        .catch((err) => {
-          console.error("Error loading Leaflet module in RestaurantCard:", err);
-          if (isMounted) setIsLeafletCoreConfigured(false);
-        });
+    if (isDialogOpen && typeof window !== 'undefined' && !isLeafletCoreConfigured) {
+      import("leaflet").then((leafletModule) => {
+        if (!(leafletModule.Icon.Default.prototype as any)._iconInit) {
+          delete (leafletModule.Icon.Default.prototype as any)._getIconUrl;
+          leafletModule.Icon.Default.mergeOptions({
+            iconRetinaUrl: markerIcon2x.src,
+            iconUrl: markerIcon.src,
+            shadowUrl: markerShadow.src,
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41],
+          });
+          (leafletModule.Icon.Default.prototype as any)._iconInit = true;
+        }
+        setL(leafletModule);
+        setMarkerIconInstance(new leafletModule.Icon.Default());
+        setIsLeafletCoreConfigured(true);
+      }).catch((err) => {
+        console.error("Error loading Leaflet module in RestaurantCard:", err);
+      });
     }
-    return () => {
-      isMounted = false;
-    };
   }, [isDialogOpen, isLeafletCoreConfigured]);
 
   useEffect(() => {
