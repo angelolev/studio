@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -112,7 +111,6 @@ function LocationMarker({
   );
 }
 
-
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -122,7 +120,7 @@ const ACCEPTED_IMAGE_TYPES = [
 ];
 
 const DEFAULT_MAP_CENTER_LIMA: LatLngExpression = [-12.046374, -77.042793];
-const DEFAULT_MAP_ZOOM = 15;
+const DEFAULT_MAP_ZOOM = 17;
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, {
@@ -163,10 +161,12 @@ export default function AddRestaurantPage() {
   const queryClient = useQueryClient();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  const [L, setL] = useState<typeof import('leaflet') | null>(null);
-  const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(null);
+  const [L, setL] = useState<typeof import("leaflet") | null>(null);
+  const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(
+    null
+  );
   const [mapReady, setMapReady] = useState(false);
-  
+
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(
     DEFAULT_MAP_CENTER_LIMA
   );
@@ -196,45 +196,58 @@ export default function AddRestaurantPage() {
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && !mapReady) { // Only run if map not ready
-      import('leaflet').then(leafletModule => {
-        configureLeafletDefaultIcon(leafletModule); // Configure prototype
-        const icon = new leafletModule.Icon.Default(); // Create instance from configured prototype
-        setL(leafletModule);
-        setMapMarkerIcon(icon);
-        setMapReady(true);
-      }).catch(error => {
-        console.error("Failed to load Leaflet module for AddRestaurantPage", error);
-        toast({
+    if (typeof window !== "undefined" && !mapReady) {
+      // Only run if map not ready
+      import("leaflet")
+        .then((leafletModule) => {
+          configureLeafletDefaultIcon(leafletModule); // Configure prototype
+          const icon = new leafletModule.Icon.Default(); // Create instance from configured prototype
+          setL(leafletModule);
+          setMapMarkerIcon(icon);
+          setMapReady(true);
+        })
+        .catch((error) => {
+          console.error(
+            "Failed to load Leaflet module for AddRestaurantPage",
+            error
+          );
+          toast({
             title: "Error de Mapa",
             description: "No se pudo cargar el módulo del mapa.",
             variant: "destructive",
+          });
         });
-      });
     }
   }, [mapReady, toast]); // Run when mapReady changes (initially false) or on first client render
 
   useEffect(() => {
-    if (mapReady && L && navigator.geolocation && form && !form.getValues("latitude") && !form.getValues("longitude")) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const userLatLng = L.latLng(
-              position.coords.latitude,
-              position.coords.longitude
-            );
-            setCurrentMapCenter([userLatLng.lat, userLatLng.lng]);
-            if (mapRef.current) {
-              mapRef.current.flyTo(userLatLng, DEFAULT_MAP_ZOOM + 2);
-            }
-          },
-          (error) => {
-            console.warn(`Error obteniendo geolocalización: ${error.message}`);
-            if (mapRef.current) {
-              mapRef.current.flyTo(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
-            }
-          },
-          { timeout: 10000 }
-        );
+    if (
+      mapReady &&
+      L &&
+      navigator.geolocation &&
+      form &&
+      !form.getValues("latitude") &&
+      !form.getValues("longitude")
+    ) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userLatLng = L.latLng(
+            position.coords.latitude,
+            position.coords.longitude
+          );
+          setCurrentMapCenter([userLatLng.lat, userLatLng.lng]);
+          if (mapRef.current) {
+            mapRef.current.flyTo(userLatLng, DEFAULT_MAP_ZOOM + 2);
+          }
+        },
+        (error) => {
+          console.warn(`Error obteniendo geolocalización: ${error.message}`);
+          if (mapRef.current) {
+            mapRef.current.flyTo(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
+          }
+        },
+        { timeout: 10000 }
+      );
     }
   }, [mapReady, L, form]);
 
@@ -428,9 +441,9 @@ export default function AddRestaurantPage() {
           );
           form.setValue("latitude", userLatLng.lat, { shouldValidate: true });
           form.setValue("longitude", userLatLng.lng, { shouldValidate: true });
-          setSelectedMapPosition(userLatLng); 
+          setSelectedMapPosition(userLatLng);
           if (mapRef.current) {
-            mapRef.current.flyTo(userLatLng, 18); 
+            mapRef.current.flyTo(userLatLng, 18);
           }
         },
         (error) => {
@@ -452,15 +465,18 @@ export default function AddRestaurantPage() {
     }
   };
 
-  const handleMapClick = useCallback((latlng: LatLng) => {
-    setSelectedMapPosition(latlng);
-    form.setValue("latitude", latlng.lat, {
-      shouldValidate: true,
-    });
-    form.setValue("longitude", latlng.lng, {
-      shouldValidate: true,
-    });
-  }, [form]);
+  const handleMapClick = useCallback(
+    (latlng: LatLng) => {
+      setSelectedMapPosition(latlng);
+      form.setValue("latitude", latlng.lat, {
+        shouldValidate: true,
+      });
+      form.setValue("longitude", latlng.lng, {
+        shouldValidate: true,
+      });
+    },
+    [form]
+  );
 
   if (loadingAuthState) {
     return (
@@ -490,7 +506,7 @@ export default function AddRestaurantPage() {
     : currentMapCenter;
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
+    <div className="max-w-2xl mx-auto pb-8">
       <div className="mb-6">
         <Link href="/" passHref legacyBehavior>
           <Button variant="outline" size="sm">
@@ -602,7 +618,13 @@ export default function AddRestaurantPage() {
                       Haz clic en el mapa para seleccionar la ubicación del
                       restaurante.
                     </FormDescription>
-                    {mapReady && L && mapMarkerIcon && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
+                    {mapReady &&
+                    L &&
+                    mapMarkerIcon &&
+                    LeafletMapContainer &&
+                    LeafletTileLayer &&
+                    LeafletMarker &&
+                    LeafletPopup ? (
                       <LeafletMapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
@@ -618,13 +640,13 @@ export default function AddRestaurantPage() {
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
-                        
-                        <LocationMarker 
-                            position={selectedMapPosition} 
-                            onMapClick={handleMapClick}
-                            icon={mapMarkerIcon}
-                            MarkerComponent={LeafletMarker}
-                            PopupComponent={LeafletPopup}
+
+                        <LocationMarker
+                          position={selectedMapPosition}
+                          onMapClick={handleMapClick}
+                          icon={mapMarkerIcon}
+                          MarkerComponent={LeafletMarker}
+                          PopupComponent={LeafletPopup}
                         />
                       </LeafletMapContainer>
                     ) : (
@@ -720,7 +742,7 @@ export default function AddRestaurantPage() {
                     render={({ field: imageField }) => (
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
-                        <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex sm:flex-row gap-2">
                           <Button
                             type="button"
                             onClick={openCamera}
@@ -744,8 +766,8 @@ export default function AddRestaurantPage() {
                               className="sr-only"
                               accept={ACCEPTED_IMAGE_TYPES.join(",")}
                               ref={(instance) => {
-                                imageField.ref(instance); 
-                                fileUploadInputRef.current = instance; 
+                                imageField.ref(instance);
+                                fileUploadInputRef.current = instance;
                               }}
                               onChange={(e) => {
                                 handleImageFileChange(e);
@@ -789,6 +811,7 @@ export default function AddRestaurantPage() {
                 type="submit"
                 className="w-full"
                 disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
+                variant="outline"
               >
                 {mutation.isPending ? (
                   <>

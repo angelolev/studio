@@ -355,7 +355,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               zoom={17}
               scrollWheelZoom={false}
               style={{
-                height: "200px",
+                height: "150px",
                 width: "100%",
                 borderRadius: "var(--radius)",
               }}
@@ -395,7 +395,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </p>
         ) : null}
 
-        <Separator className="my-4" />
+        {/* <Separator className="my-4" /> */}
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
           <ReviewSummary
             restaurantName={restaurant.name}

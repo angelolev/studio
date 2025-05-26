@@ -1,18 +1,16 @@
+"use client";
 
-'use client';
-
-import { PlusCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import { PlusCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-
+} from "@/components/ui/tooltip";
 
 export default function FloatingAddButton() {
   const { user, loadingAuthState, signInWithGoogle } = useAuth();
@@ -22,18 +20,25 @@ export default function FloatingAddButton() {
   const handleAddRestaurantClick = () => {
     if (!user && !loadingAuthState) {
       toast({
-        title: 'Autenticación Requerida',
-        description: 'Por favor, inicia sesión para agregar un nuevo restaurante.',
-        action: <Button onClick={async () => {
-          try {
-            await signInWithGoogle();
-          } catch (error) {
-            // signInWithGoogle in AuthContext should handle its own errors
-          }
-        }}>Iniciar Sesión</Button>,
+        title: "Autenticación Requerida",
+        description:
+          "Por favor, inicia sesión para agregar un nuevo restaurante.",
+        action: (
+          <Button
+            onClick={async () => {
+              try {
+                await signInWithGoogle();
+              } catch (error) {
+                // signInWithGoogle in AuthContext should handle its own errors
+              }
+            }}
+          >
+            Iniciar Sesión
+          </Button>
+        ),
       });
     } else if (user) {
-      router.push('/add-restaurant');
+      router.push("/add-restaurant");
     }
   };
 
@@ -54,9 +59,6 @@ export default function FloatingAddButton() {
             <PlusCircle className="h-8 w-8" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="left" className="bg-primary text-primary-foreground border-primary-foreground/50">
-          <p>Agregar Restaurante</p>
-        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
