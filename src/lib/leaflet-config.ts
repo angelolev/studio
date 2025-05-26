@@ -8,23 +8,21 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-export function configureLeafletDefaultIcon(L: typeof import('leaflet')) {
-  // Check if already configured (e.g., by another component instance or HMR)
+export function configureLeafletDefaultIcon(LInstance: typeof import('leaflet')) {
+  // Check if already configured on the LInstance's Icon.Default prototype
   // This flag is set on the prototype of the L.Icon.Default class itself.
-  if ((L.Icon.Default.prototype as any)._iconInit) {
-    return;
+  if (!(LInstance.Icon.Default.prototype as any)._iconInit) {
+    delete (LInstance.Icon.Default.prototype as any)._getIconUrl; // Recommended to prevent Leaflet from trying to guess paths
+
+    LInstance.Icon.Default.mergeOptions({
+      iconRetinaUrl: markerIcon2x.src,
+      iconUrl: markerIcon.src,
+      shadowUrl: markerShadow.src,
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41],
+    });
+    (LInstance.Icon.Default.prototype as any)._iconInit = true;
   }
-
-  delete (L.Icon.Default.prototype as any)._getIconUrl; // Recommended to prevent Leaflet from trying to guess paths
-
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: markerIcon2x.src,
-    iconUrl: markerIcon.src,
-    shadowUrl: markerShadow.src,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41],
-  });
-  (L.Icon.Default.prototype as any)._iconInit = true;
 }
