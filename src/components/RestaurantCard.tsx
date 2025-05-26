@@ -38,6 +38,7 @@ import type {
 import type leaflet from "leaflet"; // For L type
 import dynamic from "next/dynamic";
 
+// Import marker images
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -131,11 +132,14 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             (leafletModule.Icon.Default.prototype as any)._iconInit = true;
           }
           setL(leafletModule);
-          setIsLeafletConfigured(true); // Mark leaflet as loaded and configured
+          setIsLeafletConfigured(true);
         })
-        .catch((err) =>
-          console.error("Error loading Leaflet in RestaurantCard:", err)
-        );
+        .catch((err) => {
+          console.error("Error loading Leaflet module in RestaurantCard:", err);
+          if (isMounted) {
+            setIsLeafletConfigured(false); // Ensure it reflects loading failure
+          }
+        });
     }
     return () => {
       isMounted = false;
@@ -146,10 +150,15 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     if (isDialogOpen && L && isLeafletConfigured) {
       setMapReadyDialog(true);
     } else if (!isDialogOpen) {
-      if (mapRefDialog.current) {
-        mapRefDialog.current.remove();
-        mapRefDialog.current = null;
+      // Cleanup when dialog closes
+      if (mapRefDialog.current && typeof mapRefDialog.current.remove === 'function') {
+        try {
+          mapRefDialog.current.remove();
+        } catch (e) {
+          console.error("Error removing map instance:", e);
+        }
       }
+      mapRefDialog.current = null;
       setMapReadyDialog(false);
     }
   }, [isDialogOpen, L, isLeafletConfigured]);
@@ -167,7 +176,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   }, [reviewsError, toast]);
 
   const markerIconInstance = useMemo(() => {
-    if (L && isLeafletConfigured) { // Guard against L being null or not configured
+    if (L && isLeafletConfigured) {
       return new L.Icon.Default();
     }
     return undefined;
@@ -302,7 +311,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
-          <DialogDescription className="text-base">
+           <DialogDescription className="text-base">
             {cuisineNames}
           </DialogDescription>
           {restaurant.address && (
@@ -319,19 +328,19 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </div>
         </DialogHeader>
 
-        {isDialogOpen && mapReadyDialog && restaurantLocation && L && markerIconInstance && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
+        {isDialogOpen && mapReadyDialog && restaurantLocation && L && isLeafletConfigured && markerIconInstance && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
           <div className="my-4">
             <LeafletMapContainer
               key={restaurant.id + (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")}
               center={restaurantLocation}
-              zoom={17} // Increased zoom
+              zoom={17}
               scrollWheelZoom={false}
               style={{
                 height: "200px",
                 width: "100%",
                 borderRadius: "var(--radius)",
               }}
-              whenCreated={(mapInstance) => { mapRefDialog.current = mapInstance; }}
+              ref={mapRefDialog} // Use ref prop
             >
               <LeafletTileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
