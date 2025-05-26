@@ -30,18 +30,20 @@ import { Loader2, MapPin, Navigation } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
+
 import type {
   LatLngExpression,
   Icon as LeafletIconType,
   Map as LeafletMapType,
 } from "leaflet";
-import type leaflet from "leaflet"; // For L type
-import dynamic from "next/dynamic";
+import type leaflet from "leaflet";
 
-// Import marker images
+// Import marker images directly
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+import dynamic from "next/dynamic";
 
 const LeafletMapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
@@ -79,7 +81,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const [L, setL] = useState<typeof leaflet | null>(null);
-  const [isLeafletConfigured, setIsLeafletConfigured] = useState(false);
+  const [isLeafletCoreConfigured, setIsLeafletCoreConfigured] = useState(false);
   const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const mapRefDialog = useRef<LeafletMapType | null>(null);
 
@@ -94,7 +96,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     staleTime: 5 * 60 * 1000,
-    enabled: true,
+    enabled: true, // Fetch reviews for card display
     select: (data) =>
       data.map((review) => ({
         ...review,
@@ -114,7 +116,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
   useEffect(() => {
     let isMounted = true;
-    if (isDialogOpen && !isLeafletConfigured) {
+    if (isDialogOpen && !isLeafletCoreConfigured) {
       import("leaflet")
         .then((leafletModule) => {
           if (!isMounted) return;
@@ -132,36 +134,42 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             (leafletModule.Icon.Default.prototype as any)._iconInit = true;
           }
           setL(leafletModule);
-          setIsLeafletConfigured(true);
+          setIsLeafletCoreConfigured(true); // Signal that L and its prototype are ready
         })
         .catch((err) => {
           console.error("Error loading Leaflet module in RestaurantCard:", err);
-          if (isMounted) {
-            setIsLeafletConfigured(false); // Ensure it reflects loading failure
-          }
+          if (isMounted) setIsLeafletCoreConfigured(false);
         });
     }
     return () => {
       isMounted = false;
     };
-  }, [isDialogOpen, isLeafletConfigured]);
+  }, [isDialogOpen, isLeafletCoreConfigured]);
 
   useEffect(() => {
-    if (isDialogOpen && L && isLeafletConfigured) {
+    if (isDialogOpen && isLeafletCoreConfigured && L) {
       setMapReadyDialog(true);
     } else if (!isDialogOpen) {
-      // Cleanup when dialog closes
       if (mapRefDialog.current && typeof mapRefDialog.current.remove === 'function') {
         try {
           mapRefDialog.current.remove();
         } catch (e) {
-          console.error("Error removing map instance:", e);
+          console.error("Error removing map instance in RestaurantCard:", e);
         }
       }
       mapRefDialog.current = null;
       setMapReadyDialog(false);
+      // Do not reset L or isLeafletCoreConfigured here, as they are global setup
     }
-  }, [isDialogOpen, L, isLeafletConfigured]);
+  }, [isDialogOpen, L, isLeafletCoreConfigured]);
+
+
+  const markerIconInstance = useMemo(() => {
+    if (L && (L.Icon.Default.prototype as any)._iconInit) {
+      return new L.Icon.Default();
+    }
+    return undefined;
+  }, [L]);
 
 
   useEffect(() => {
@@ -175,12 +183,6 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     }
   }, [reviewsError, toast]);
 
-  const markerIconInstance = useMemo(() => {
-    if (L && isLeafletConfigured) {
-      return new L.Icon.Default();
-    }
-    return undefined;
-  }, [L, isLeafletConfigured]);
 
   const averageRating = useMemo(() => {
     if (reviews.length > 0) {
@@ -297,7 +299,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         </div>
 
         <div className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto">
-          {isLoadingReviews && !isDialogOpen ? (
+          {isLoadingReviews && !isDialogOpen ? ( // Show loader on card only if dialog is not open
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
           ) : (
             <StarRating rating={averageRating} readOnly size={16} />
@@ -328,7 +330,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </div>
         </DialogHeader>
 
-        {isDialogOpen && mapReadyDialog && restaurantLocation && L && isLeafletConfigured && markerIconInstance && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
+        {isDialogOpen && mapReadyDialog && restaurantLocation && L && isLeafletCoreConfigured && markerIconInstance && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
           <div className="my-4">
             <LeafletMapContainer
               key={restaurant.id + (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")}
@@ -340,7 +342,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
                 width: "100%",
                 borderRadius: "var(--radius)",
               }}
-              ref={mapRefDialog} // Use ref prop
+              ref={mapRefDialog}
             >
               <LeafletTileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -365,7 +367,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               Obtener Direcciones
             </Button>
           </div>
-        ) : isDialogOpen && !mapReadyDialog && restaurantLocation && (L || isLeafletConfigured) ? (
+        ) : isDialogOpen && !mapReadyDialog && restaurantLocation && (L || isLeafletCoreConfigured) ? (
           <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <p className="ml-2">Cargando mapa...</p>

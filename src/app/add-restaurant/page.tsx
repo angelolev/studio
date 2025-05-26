@@ -18,6 +18,7 @@ import type {
 import type leaflet from "leaflet"; // For L type
 import dynamic from "next/dynamic";
 
+// Import marker images directly
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -100,7 +101,6 @@ const MapEventsComponent = dynamic(
   { ssr: false }
 );
 
-
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -147,16 +147,18 @@ type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
 interface LocationMarkerProps {
   position: LatLng | null;
   icon: LeafletIconType | null;
+  MarkerComponent: typeof LeafletMarker | null;
+  PopupComponent: typeof LeafletPopup | null;
 }
 
-function LocationMarker({ position, icon }: LocationMarkerProps) {
-  if (!position || !icon || !LeafletMarker || !LeafletPopup) {
+function LocationMarker({ position, icon, MarkerComponent, PopupComponent }: LocationMarkerProps) {
+  if (!position || !icon || !MarkerComponent || !PopupComponent) {
     return null;
   }
   return (
-    <LeafletMarker position={position} icon={icon}>
-      <LeafletPopup>Has seleccionado esta ubicación</LeafletPopup>
-    </LeafletMarker>
+    <MarkerComponent position={position} icon={icon}>
+      <PopupComponent>Has seleccionado esta ubicación</PopupComponent>
+    </MarkerComponent>
   );
 }
 
@@ -169,7 +171,7 @@ export default function AddRestaurantPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [L, setL] = useState<typeof leaflet | null>(null);
-  const [isLeafletConfigured, setIsLeafletConfigured] = useState(false);
+  const [isLeafletCoreConfigured, setIsLeafletCoreConfigured] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(
     DEFAULT_MAP_CENTER_LIMA
@@ -203,7 +205,7 @@ export default function AddRestaurantPage() {
 
   useEffect(() => {
     let isMounted = true;
-    if (!isLeafletConfigured) {
+    if (!isLeafletCoreConfigured) {
       import("leaflet")
         .then((leafletModule) => {
           if (!isMounted) return;
@@ -221,26 +223,30 @@ export default function AddRestaurantPage() {
             (leafletModule.Icon.Default.prototype as any)._iconInit = true;
           }
           setL(leafletModule);
-          setMapMarkerIcon(new leafletModule.Icon.Default());
-          setIsLeafletConfigured(true);
+          setIsLeafletCoreConfigured(true);
+          if ((leafletModule.Icon.Default.prototype as any)._iconInit) {
+            setMapMarkerIcon(new leafletModule.Icon.Default());
+          }
         })
-        .catch((err) =>
-          console.error("Error loading Leaflet in AddRestaurantPage:", err)
-        );
+        .catch((err) => {
+          console.error("Error loading Leaflet module in AddRestaurantPage:", err);
+          if (isMounted) setIsLeafletCoreConfigured(false);
+        });
     }
     return () => {
       isMounted = false;
     };
-  }, [isLeafletConfigured]);
+  }, [isLeafletCoreConfigured]);
 
   useEffect(() => {
-    if (isLeafletConfigured) {
-      setMapReady(true);
+    if (isLeafletCoreConfigured && L) {
+       setMapReady(true);
     }
-  }, [isLeafletConfigured]);
+  }, [isLeafletCoreConfigured, L]);
+
 
   useEffect(() => {
-    if (mapReady && L && navigator.geolocation) {
+    if (mapReady && L && navigator.geolocation && form) { // Added form to dependency check
       if (
         form.getValues("latitude") === undefined &&
         form.getValues("longitude") === undefined
@@ -267,7 +273,7 @@ export default function AddRestaurantPage() {
         );
       }
     }
-  }, [mapReady, L, form]);
+  }, [mapReady, L, form]); // Added form to dependency array
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -442,7 +448,7 @@ export default function AddRestaurantPage() {
   };
 
   const centerMapOnUser = () => {
-    if (!L || !isLeafletConfigured) {
+    if (!L || !isLeafletCoreConfigured) {
       toast({
         title: "Mapa no listo",
         description: "Por favor, espera a que el mapa cargue.",
@@ -459,9 +465,9 @@ export default function AddRestaurantPage() {
           );
           form.setValue("latitude", userLatLng.lat, { shouldValidate: true });
           form.setValue("longitude", userLatLng.lng, { shouldValidate: true });
-          setSelectedMapPosition(userLatLng); // This should update the marker via LocationMarker
+          setSelectedMapPosition(userLatLng); 
           if (mapRef.current) {
-            mapRef.current.flyTo(userLatLng, 18); // Zoom in when centering on user
+            mapRef.current.flyTo(userLatLng, 18); 
           }
         },
         (error) => {
@@ -613,7 +619,7 @@ export default function AddRestaurantPage() {
                         size="sm"
                         onClick={centerMapOnUser}
                         className="gap-1.5"
-                        disabled={!isLeafletConfigured}
+                        disabled={!mapReady || !L || !isLeafletCoreConfigured}
                       >
                         <LocateFixed size={16} />
                         Usar mi ubicación
@@ -623,7 +629,7 @@ export default function AddRestaurantPage() {
                       Haz clic en el mapa para seleccionar la ubicación del
                       restaurante.
                     </FormDescription>
-                    {mapReady && LeafletMapContainer && LeafletTileLayer && L && mapMarkerIcon ? (
+                    {mapReady && LeafletMapContainer && LeafletTileLayer && MapEventsComponent && L && isLeafletCoreConfigured && mapMarkerIcon ? (
                       <LeafletMapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
@@ -633,17 +639,13 @@ export default function AddRestaurantPage() {
                           borderRadius: "6px",
                         }}
                         scrollWheelZoom={true}
-                        ref={(mapInstance: LeafletMapType | null) => {
-                          if (mapInstance) {
-                            mapRef.current = mapInstance;
-                          }
-                        }}
+                        ref={mapRef}
                       >
                         <LeafletTileLayer
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
-                        {MapEventsComponent && (
+                        
                           <MapEventsComponent
                             onMapClick={(latlng) => {
                               setSelectedMapPosition(latlng);
@@ -655,8 +657,8 @@ export default function AddRestaurantPage() {
                               });
                             }}
                           />
-                        )}
-                        <LocationMarker position={selectedMapPosition} icon={mapMarkerIcon} />
+                        
+                        <LocationMarker position={selectedMapPosition} icon={mapMarkerIcon} MarkerComponent={LeafletMarker} PopupComponent={LeafletPopup} />
                       </LeafletMapContainer>
                     ) : (
                       <div className="h-[300px] w-full flex items-center justify-center bg-muted rounded-md">
@@ -775,8 +777,8 @@ export default function AddRestaurantPage() {
                               className="sr-only"
                               accept={ACCEPTED_IMAGE_TYPES.join(",")}
                               ref={(instance) => {
-                                imageField.ref(instance); // From react-hook-form
-                                fileUploadInputRef.current = instance; // For programmatic click
+                                imageField.ref(instance); 
+                                fileUploadInputRef.current = instance; 
                               }}
                               onChange={(e) => {
                                 handleImageFileChange(e);
