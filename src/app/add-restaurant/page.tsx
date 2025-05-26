@@ -101,6 +101,29 @@ const MapEventsComponent = dynamic(
   { ssr: false }
 );
 
+interface LocationMarkerProps {
+  position: LatLng | null;
+  icon: LeafletIconType | null; // Expect an instance of L.Icon
+  MarkerComponent: typeof LeafletMarker | null; // react-leaflet Marker component
+  PopupComponent: typeof LeafletPopup | null; // react-leaflet Popup component
+}
+
+function LocationMarker({
+  position,
+  icon,
+  MarkerComponent,
+  PopupComponent,
+}: LocationMarkerProps) {
+  if (!position || !icon || !MarkerComponent || !PopupComponent) {
+    return null;
+  }
+  return (
+    <MarkerComponent position={position} icon={icon}>
+      <PopupComponent>Has seleccionado esta ubicación</PopupComponent>
+    </MarkerComponent>
+  );
+}
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -110,7 +133,7 @@ const ACCEPTED_IMAGE_TYPES = [
 ];
 
 const DEFAULT_MAP_CENTER_LIMA: LatLngExpression = [-12.046374, -77.042793];
-const DEFAULT_MAP_ZOOM = 15;
+const DEFAULT_MAP_ZOOM = 15; // Increased default zoom
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, {
@@ -144,25 +167,6 @@ const addRestaurantSchema = z.object({
 
 type AddRestaurantFormData = z.infer<typeof addRestaurantSchema>;
 
-interface LocationMarkerProps {
-  position: LatLng | null;
-  icon: LeafletIconType | null;
-  MarkerComponent: typeof LeafletMarker | null;
-  PopupComponent: typeof LeafletPopup | null;
-}
-
-function LocationMarker({ position, icon, MarkerComponent, PopupComponent }: LocationMarkerProps) {
-  if (!position || !icon || !MarkerComponent || !PopupComponent) {
-    return null;
-  }
-  return (
-    <MarkerComponent position={position} icon={icon}>
-      <PopupComponent>Has seleccionado esta ubicación</PopupComponent>
-    </MarkerComponent>
-  );
-}
-
-
 export default function AddRestaurantPage() {
   const { user, loadingAuthState } = useAuth();
   const router = useRouter();
@@ -172,13 +176,13 @@ export default function AddRestaurantPage() {
 
   const [L, setL] = useState<typeof leaflet | null>(null);
   const [isLeafletCoreConfigured, setIsLeafletCoreConfigured] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
+  const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(null);
+  const [mapReady, setMapReady] = useState(false); // Only for triggering map render after dynamic imports
+  
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(
     DEFAULT_MAP_CENTER_LIMA
   );
   const mapRef = useRef<LeafletMapType | null>(null);
-  const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(null);
-
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -205,10 +209,12 @@ export default function AddRestaurantPage() {
 
   useEffect(() => {
     let isMounted = true;
-    if (!isLeafletCoreConfigured) {
+    if (isMounted && !isLeafletCoreConfigured) {
       import("leaflet")
         .then((leafletModule) => {
           if (!isMounted) return;
+
+          // Configure the global default icon prototype if not already done
           if (!(leafletModule.Icon.Default.prototype as any)._iconInit) {
             delete (leafletModule.Icon.Default.prototype as any)._getIconUrl;
             leafletModule.Icon.Default.mergeOptions({
@@ -222,11 +228,11 @@ export default function AddRestaurantPage() {
             });
             (leafletModule.Icon.Default.prototype as any)._iconInit = true;
           }
+          
           setL(leafletModule);
+          // Create the icon instance *after* prototype configuration
+          setMapMarkerIcon(new leafletModule.Icon.Default());
           setIsLeafletCoreConfigured(true);
-          if ((leafletModule.Icon.Default.prototype as any)._iconInit) {
-            setMapMarkerIcon(new leafletModule.Icon.Default());
-          }
         })
         .catch((err) => {
           console.error("Error loading Leaflet module in AddRestaurantPage:", err);
@@ -238,19 +244,17 @@ export default function AddRestaurantPage() {
     };
   }, [isLeafletCoreConfigured]);
 
+
   useEffect(() => {
-    if (isLeafletCoreConfigured && L) {
-       setMapReady(true);
+    // This effect should run after Leaflet core (L) and its icon are configured
+    if (isLeafletCoreConfigured && L && mapMarkerIcon) {
+       setMapReady(true); // Signal that Leaflet components can now be rendered
     }
-  }, [isLeafletCoreConfigured, L]);
+  }, [isLeafletCoreConfigured, L, mapMarkerIcon]);
 
 
   useEffect(() => {
-    if (mapReady && L && navigator.geolocation && form) { // Added form to dependency check
-      if (
-        form.getValues("latitude") === undefined &&
-        form.getValues("longitude") === undefined
-      ) {
+    if (mapReady && L && navigator.geolocation && form && !form.getValues("latitude") && !form.getValues("longitude")) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const userLatLng = L.latLng(
@@ -264,16 +268,15 @@ export default function AddRestaurantPage() {
           },
           (error) => {
             console.warn(`Error obteniendo geolocalización: ${error.message}`);
-            setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
+            // Keep default center if geolocation fails
             if (mapRef.current) {
               mapRef.current.flyTo(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
             }
           },
           { timeout: 10000 }
         );
-      }
     }
-  }, [mapReady, L, form]); // Added form to dependency array
+  }, [mapReady, L, form]);
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -364,7 +367,7 @@ export default function AddRestaurantPage() {
 
   useEffect(() => {
     return () => {
-      if (stream && !isCameraOpen) {
+      if (stream && !isCameraOpen) { // Also ensure camera is closed if component unmounts while camera is open
         stream.getTracks().forEach((track) => track.stop());
       }
     };
@@ -608,7 +611,7 @@ export default function AddRestaurantPage() {
 
               <FormField
                 control={form.control}
-                name="latitude"
+                name="latitude" // Keep this for validation, but map interaction is primary
                 render={({ fieldState: latitudeFieldState }) => (
                   <FormItem>
                     <div className="flex justify-between items-center">

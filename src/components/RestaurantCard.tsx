@@ -84,6 +84,8 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const [isLeafletCoreConfigured, setIsLeafletCoreConfigured] = useState(false);
   const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const mapRefDialog = useRef<LeafletMapType | null>(null);
+  const [markerIconInstance, setMarkerIconInstance] = useState<LeafletIconType | null>(null);
+
 
   const restaurantReviewsQueryKey = ["reviews", restaurant.id];
   const userReviewedQueryKey = ["userReviewed", restaurant.id, user?.uid];
@@ -96,7 +98,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     staleTime: 5 * 60 * 1000,
-    enabled: true, // Fetch reviews for card display
+    enabled: true, 
     select: (data) =>
       data.map((review) => ({
         ...review,
@@ -134,7 +136,8 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             (leafletModule.Icon.Default.prototype as any)._iconInit = true;
           }
           setL(leafletModule);
-          setIsLeafletCoreConfigured(true); // Signal that L and its prototype are ready
+          setMarkerIconInstance(new leafletModule.Icon.Default());
+          setIsLeafletCoreConfigured(true); 
         })
         .catch((err) => {
           console.error("Error loading Leaflet module in RestaurantCard:", err);
@@ -147,7 +150,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   }, [isDialogOpen, isLeafletCoreConfigured]);
 
   useEffect(() => {
-    if (isDialogOpen && isLeafletCoreConfigured && L) {
+    if (isDialogOpen && isLeafletCoreConfigured && L && markerIconInstance) {
       setMapReadyDialog(true);
     } else if (!isDialogOpen) {
       if (mapRefDialog.current && typeof mapRefDialog.current.remove === 'function') {
@@ -159,17 +162,8 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       }
       mapRefDialog.current = null;
       setMapReadyDialog(false);
-      // Do not reset L or isLeafletCoreConfigured here, as they are global setup
     }
-  }, [isDialogOpen, L, isLeafletCoreConfigured]);
-
-
-  const markerIconInstance = useMemo(() => {
-    if (L && (L.Icon.Default.prototype as any)._iconInit) {
-      return new L.Icon.Default();
-    }
-    return undefined;
-  }, [L]);
+  }, [isDialogOpen, L, isLeafletCoreConfigured, markerIconInstance]);
 
 
   useEffect(() => {
@@ -299,7 +293,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         </div>
 
         <div className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto">
-          {isLoadingReviews && !isDialogOpen ? ( // Show loader on card only if dialog is not open
+          {isLoadingReviews && !isDialogOpen ? ( 
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
           ) : (
             <StarRating rating={averageRating} readOnly size={16} />
@@ -335,7 +329,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             <LeafletMapContainer
               key={restaurant.id + (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")}
               center={restaurantLocation}
-              zoom={17}
+              zoom={17} 
               scrollWheelZoom={false}
               style={{
                 height: "200px",
