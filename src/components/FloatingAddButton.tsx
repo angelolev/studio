@@ -42,19 +42,19 @@ export default function FloatingAddButton() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant="default"
-            size="icon"
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 flex items-center justify-center
+            variant="default" // Ensures it uses primary color defined in globals.css
+            size="lg" // Slightly larger for better visibility
+            className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-xl z-50 flex items-center justify-center
                        bg-primary hover:bg-primary/90 text-primary-foreground
-                       transition-transform hover:scale-110 active:scale-95"
+                       transition-transform hover:scale-105 active:scale-95 border-2 border-primary-foreground/50" // Added border for more definition
             onClick={handleAddRestaurantClick}
             aria-label="Agregar nuevo restaurante"
             disabled={loadingAuthState}
           >
-            <PlusCircle className="h-7 w-7" />
+            <PlusCircle className="h-8 w-8" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="left" className="bg-primary text-primary-foreground">
+        <TooltipContent side="left" className="bg-primary text-primary-foreground border-primary-foreground/50">
           <p>Agregar Restaurante</p>
         </TooltipContent>
       </Tooltip>

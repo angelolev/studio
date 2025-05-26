@@ -20,7 +20,7 @@ const SummarizeReviewsInputSchema = z.object({
 export type SummarizeReviewsInput = z.infer<typeof SummarizeReviewsInputSchema>;
 
 const SummarizeReviewsOutputSchema = z.object({
-  summary: z.string().describe('Un sentimiento resumido de las opiniones anteriores.'),
+  summary: z.string().describe('Un sentimiento resumido de las opiniones anteriores, en español.'),
 });
 export type SummarizeReviewsOutput = z.infer<typeof SummarizeReviewsOutputSchema>;
 
@@ -32,7 +32,7 @@ const summarizeReviewsPrompt = ai.definePrompt({
   name: 'summarizeReviewsPrompt',
   input: {schema: SummarizeReviewsInputSchema},
   output: {schema: SummarizeReviewsOutputSchema},
-  prompt: `Summarize the following user reviews for {{restaurantName}}. Extract keywords and common sentiments from each review, and display the most relevant sentiments to new users.\n\nReviews:\n{{#each reviews}}- {{{this}}}\n{{/each}}\n\nSummary: `,
+  prompt: `Resume las siguientes opiniones de usuarios para el restaurante "{{restaurantName}}" en español. Extrae palabras clave y sentimientos comunes de cada opinión, y muestra los sentimientos más relevantes para nuevos usuarios. El resumen debe estar en español.\n\nOpiniones:\n{{#each reviews}}- {{{this}}}\n{{/each}}\n\nResumen en español: `,
 });
 
 const summarizeReviewsFlow = ai.defineFlow(
