@@ -17,14 +17,6 @@ export function configureLeafletDefaultIcon(
     const iconUrl = `${iconBasePath}marker-icon.png`;
     const iconRetinaUrl = `${iconBasePath}marker-icon-2x.png`;
     const shadowUrl = `${iconBasePath}marker-shadow.png`;
-
-    console.log(
-      "[leaflet-config] Configuring Leaflet default icon. Using static paths:"
-    );
-    console.log("[leaflet-config] iconUrl:", iconUrl);
-    console.log("[leaflet-config] iconRetinaUrl:", iconRetinaUrl);
-    console.log("[leaflet-config] shadowUrl:", shadowUrl);
-
     const defaultOptions = LInstance.Icon.Default.prototype.options;
 
     // Direct assignment
@@ -41,9 +33,5 @@ export function configureLeafletDefaultIcon(
     defaultOptions.shadowSize = [41, 41];
 
     (LInstance.Icon.Default.prototype as any)._iconInit = true;
-    console.log(
-      "[leaflet-config] Icon.Default.prototype.options after configuration:",
-      JSON.stringify(LInstance.Icon.Default.prototype.options)
-    );
   }
 }

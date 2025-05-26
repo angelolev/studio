@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -217,7 +216,14 @@ export default function AddRestaurantPage() {
   }, [mapReady, toast]);
 
   useEffect(() => {
-    if (mapReady && L && navigator.geolocation && form && !form.getValues("latitude") && !form.getValues("longitude")) {
+    if (
+      mapReady &&
+      L &&
+      navigator.geolocation &&
+      form &&
+      !form.getValues("latitude") &&
+      !form.getValues("longitude")
+    ) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const userLatLng = L.latLng(
@@ -239,7 +245,6 @@ export default function AddRestaurantPage() {
       );
     }
   }, [mapReady, L, form]);
-
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -291,7 +296,7 @@ export default function AddRestaurantPage() {
     setIsCameraOpen(true);
 
     if (currentStream) {
-      currentStream.getTracks().forEach(track => track.stop());
+      currentStream.getTracks().forEach((track) => track.stop());
       setCurrentStream(null);
     }
 
@@ -300,7 +305,9 @@ export default function AddRestaurantPage() {
       setCurrentStream(newStream);
       if (videoRef.current) {
         videoRef.current.srcObject = newStream;
-        videoRef.current.play().catch(err => console.error("Error playing video:", err));
+        videoRef.current
+          .play()
+          .catch((err) => console.error("Error playing video:", err));
       }
     }
   };
@@ -347,7 +354,6 @@ export default function AddRestaurantPage() {
       }
     };
   }, [currentStream]);
-
 
   const mutation = useMutation({
     mutationFn: (data: {
@@ -703,13 +709,16 @@ export default function AddRestaurantPage() {
                       playsInline // Important for iOS
                     />
                     {hasCameraPermission === false && ( // Show if explicitly denied or error
-                        <Alert variant="destructive" className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
-                          <VideoOff className="mr-2 h-5 w-5" />
-                          <AlertTitle>Acceso a Cámara Denegado</AlertTitle>
-                          <AlertDescription>
-                            Revisa los permisos de cámara de tu navegador.
-                          </AlertDescription>
-                        </Alert>
+                      <Alert
+                        variant="destructive"
+                        className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4"
+                      >
+                        <VideoOff className="mr-2 h-5 w-5" />
+                        <AlertTitle>Acceso a Cámara Denegado</AlertTitle>
+                        <AlertDescription>
+                          Revisa los permisos de cámara de tu navegador.
+                        </AlertDescription>
+                      </Alert>
                     )}
                   </div>
                   <canvas ref={canvasRef} className="hidden"></canvas>
@@ -744,7 +753,7 @@ export default function AddRestaurantPage() {
                     render={({ field: imageField }) => (
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
-                        <div className="flex sm:flex-row flex-col gap-2">
+                        <div className="flex sm:flex-row gap-2">
                           <Button
                             type="button"
                             onClick={openCamera}
@@ -812,6 +821,7 @@ export default function AddRestaurantPage() {
               <Button
                 type="submit"
                 className="w-full"
+                variant="outline"
                 disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
               >
                 {mutation.isPending ? (
@@ -823,6 +833,14 @@ export default function AddRestaurantPage() {
                   "Agregar Restaurante"
                 )}
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/")}
+                className="w-full botder-t"
+                style={{ backgroundColor: "#e74c3c" }}
+              >
+                Cerrar
+              </Button>
             </form>
           </Form>
         </CardContent>
@@ -830,4 +848,3 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
-

@@ -477,7 +477,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             onClick={() => setIsDialogOpen(false)}
             style={{ backgroundColor: "#e74c3c" }}
           >
-            Cancelar
+            Cerrar
           </Button>
         </DialogFooter>
       </DialogContent>
