@@ -149,7 +149,7 @@ export default function ReviewForm({
                   onRate={(rate) => {
                     field.onChange(rate);
                   }}
-                  size={24} // Increased star size
+                  size={30} // Increased star size
                 />
               </FormControl>
               <FormMessage />
