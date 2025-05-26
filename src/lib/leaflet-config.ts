@@ -1,14 +1,20 @@
 
 // src/lib/leaflet-config.ts
-import L from 'leaflet';
+// This file NO LONGER imports 'L' from 'leaflet' directly at the top level.
+// It exports a function to configure an L instance that's passed to it.
+
+import type { Icon as LeafletIconType } from 'leaflet'; // Type import for L.Icon.Default
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-// Configure Leaflet's default icon paths globally and only once.
-// The (L.Icon.Default.prototype as any)._iconInit check is a simple way
-// to prevent this code from running multiple times if the module is re-evaluated (e.g., HMR).
-if (!(L.Icon.Default.prototype as any)._iconInit) {
+export function configureLeafletDefaultIcon(L: typeof import('leaflet')) {
+  // Check if already configured (e.g., by another component instance or HMR)
+  // This flag is set on the prototype of the L.Icon.Default class itself.
+  if ((L.Icon.Default.prototype as any)._iconInit) {
+    return;
+  }
+
   delete (L.Icon.Default.prototype as any)._getIconUrl; // Recommended to prevent Leaflet from trying to guess paths
 
   L.Icon.Default.mergeOptions({
@@ -22,5 +28,3 @@ if (!(L.Icon.Default.prototype as any)._iconInit) {
   });
   (L.Icon.Default.prototype as any)._iconInit = true;
 }
-
-export default L;

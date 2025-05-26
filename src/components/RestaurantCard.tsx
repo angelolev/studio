@@ -31,11 +31,11 @@ import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
 
-import L from '@/lib/leaflet-config'; // Import pre-configured L
 import type {
   LatLngExpression,
   Map as LeafletMapType,
-} from "leaflet";
+} from "leaflet"; // Type imports are fine
+import { configureLeafletDefaultIcon } from "@/lib/leaflet-config"; // Import the configuration function
 
 import dynamic from "next/dynamic";
 
@@ -55,11 +55,11 @@ const LeafletTileLayer = dynamic(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
   { ssr: false }
 );
-const DynamicLeafletMarkerDialog = dynamic( // Renamed for clarity
+const LeafletMarker = dynamic( 
   () => import("react-leaflet").then((mod) => mod.Marker),
   { ssr: false }
 );
-const DynamicLeafletPopupDialog = dynamic( // Renamed for clarity
+const LeafletPopup = dynamic( 
   () => import("react-leaflet").then((mod) => mod.Popup),
   { ssr: false }
 );
@@ -74,6 +74,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
+  const [L, setL] = useState<typeof import('leaflet') | null>(null);
   const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const mapRefDialog = useRef<LeafletMapType | null>(null);
 
@@ -107,10 +108,19 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   });
 
   useEffect(() => {
-    // L is pre-configured by importing from leaflet-config.ts
-    // We just need to ensure react-leaflet components are ready for the dialog
     if (isDialogOpen && typeof window !== 'undefined') {
-        setMapReadyDialog(true); // Assume map is ready for dialog if client-side
+      import('leaflet').then(leafletModule => {
+        configureLeafletDefaultIcon(leafletModule);
+        setL(leafletModule);
+        setMapReadyDialog(true); // Set ready after L is configured and available
+      }).catch(error => {
+        console.error("Failed to load Leaflet for dialog", error);
+        toast({
+            title: "Error de Mapa",
+            description: "No se pudo cargar el mapa para los detalles del restaurante.",
+            variant: "destructive",
+        });
+      });
     } else if (!isDialogOpen) {
       if (mapRefDialog.current && typeof (mapRefDialog.current as any).remove === 'function') {
         try {
@@ -120,9 +130,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         }
       }
       mapRefDialog.current = null;
-      setMapReadyDialog(false);
+      setMapReadyDialog(false); // Reset map readiness when dialog closes
     }
-  }, [isDialogOpen]);
+  }, [isDialogOpen, toast]);
 
 
   useEffect(() => {
@@ -283,10 +293,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </div>
         </DialogHeader>
 
-        {isDialogOpen && mapReadyDialog && restaurantLocation && LeafletMapContainer && LeafletTileLayer && DynamicLeafletMarkerDialog && DynamicLeafletPopupDialog ? (
+        {isDialogOpen && mapReadyDialog && L && restaurantLocation && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
           <div className="my-4">
             <LeafletMapContainer
-              key={restaurant.id + (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")}
+              key={restaurant.id + "-dialog-map"} // Simplified key, dialog state handles remount
               center={restaurantLocation}
               zoom={17} 
               scrollWheelZoom={false}
@@ -301,12 +311,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              {/* Rely on globally configured default icon from leaflet-config.ts */}
-              <DynamicLeafletMarkerDialog
-                position={restaurantLocation}
-              >
-                <DynamicLeafletPopupDialog>{restaurant.name}</DynamicLeafletPopupDialog>
-              </DynamicLeafletMarkerDialog>
+              <LeafletMarker position={restaurantLocation}>
+                <LeafletPopup>{restaurant.name}</LeafletPopup>
+              </LeafletMarker>
             </LeafletMapContainer>
             <Button
               variant="outline"
