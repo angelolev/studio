@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -31,19 +30,42 @@ import { Loader2, MapPin } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
-import type { LatLngExpression, Icon as LeafletIconType, Map as LeafletMapType } from 'leaflet';
-import dynamic from 'next/dynamic';
+import type {
+  LatLngExpression,
+  Icon as LeafletIconType,
+  Map as LeafletMapType,
+} from "leaflet";
+import dynamic from "next/dynamic";
 
 // Import Leaflet marker images
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-const LeafletMapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false, loading: () => <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="ml-2">Cargando mapa...</p></div> });
-const LeafletTileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
-const LeafletMarker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
-const LeafletPopup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
-
+const LeafletMapContainer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.MapContainer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <p className="ml-2">Cargando mapa...</p>
+      </div>
+    ),
+  }
+);
+const LeafletTileLayer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const LeafletMarker = dynamic(
+  () => import("react-leaflet").then((mod) => mod.Marker),
+  { ssr: false }
+);
+const LeafletPopup = dynamic(
+  () => import("react-leaflet").then((mod) => mod.Popup),
+  { ssr: false }
+);
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -56,10 +78,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const [L, setL] = useState<typeof import('leaflet') | null>(null);
-  const [ActualDefaultIcon, setActualDefaultIcon] = useState<typeof LeafletIconType.Default | null>(null);
-  const mapRefDialog = useRef<LeafletMapType | null>(null);
-
+  const [L, setL] = useState<typeof import("leaflet") | null>(null);
+  const [ActualDefaultIcon, setActualDefaultIcon] = useState<
+    typeof LeafletIconType.Default | null
+  >(null);
 
   const restaurantReviewsQueryKey = ["reviews", restaurant.id];
   const userReviewedQueryKey = ["userReviewed", restaurant.id, user?.uid];
@@ -93,43 +115,44 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   useEffect(() => {
     let isMounted = true;
     if (isDialogOpen && !L) {
-      import('leaflet').then(leafletModule => {
-        if (!isMounted) return;
-        if (!leafletModule.Icon.Default.prototype._iconInit) {
-          leafletModule.Icon.Default.mergeOptions({
-            iconRetinaUrl: markerIcon2x.src,
-            iconUrl: markerIcon.src,
-            shadowUrl: markerShadow.src,
+      import("leaflet")
+        .then((leafletModule) => {
+          if (!isMounted) return;
+          // Configure Leaflet's default icon
+          const DefaultIcon = leafletModule.Icon.Default as any;
+          if (!DefaultIcon.prototype._iconInit) {
+            leafletModule.Icon.Default.mergeOptions({
+              iconRetinaUrl: markerIcon2x.src,
+              iconUrl: markerIcon.src,
+              shadowUrl: markerShadow.src,
+            });
+            DefaultIcon.prototype._iconInit = true;
+          }
+          setL(leafletModule);
+          setActualDefaultIcon(() => leafletModule.Icon.Default);
+        })
+        .catch((error) => {
+          if (!isMounted) return;
+          console.error("Failed to load Leaflet for dialog map:", error);
+          toast({
+            title: "Error",
+            description: "No se pudo cargar el módulo del mapa para detalles.",
+            variant: "destructive",
           });
-          leafletModule.Icon.Default.prototype._iconInit = true;
-        }
-        setL(leafletModule);
-        setActualDefaultIcon(() => leafletModule.Icon.Default);
-      }).catch(error => {
-        if (!isMounted) return;
-        console.error("Failed to load Leaflet for dialog map:", error);
-        toast({ title: "Error", description: "No se pudo cargar el módulo del mapa para detalles.", variant: "destructive" });
-      });
+        });
     }
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [isDialogOpen, L, toast]);
 
   useEffect(() => {
     if (isDialogOpen && L && ActualDefaultIcon) {
       setMapReadyDialog(true);
     } else if (!isDialogOpen) {
-      if (mapRefDialog.current) {
-        try {
-          mapRefDialog.current.remove(); // Explicitly remove the map instance
-        } catch (e) {
-            console.warn("Error removing map instance from dialog:", e);
-        }
-        mapRefDialog.current = null;
-      }
       setMapReadyDialog(false);
     }
   }, [isDialogOpen, L, ActualDefaultIcon]);
-
 
   useEffect(() => {
     if (reviewsError) {
@@ -173,17 +196,22 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
   const cuisineNames = useMemo(() => {
     if (!restaurant.cuisine || restaurant.cuisine.length === 0) return "N/A";
-    return restaurant.cuisine.map(cId => {
-      const foundCuisine = allCuisines.find(c => c.id === cId);
-      return foundCuisine ? foundCuisine.name : cId;
-    }).join(', ');
+    return restaurant.cuisine
+      .map((cId) => {
+        const foundCuisine = allCuisines.find((c) => c.id === cId);
+        return foundCuisine ? foundCuisine.name : cId;
+      })
+      .join(", ");
   }, [restaurant.cuisine]);
 
   const imageHint = useMemo(() => {
-    if (restaurant.imageUrl && restaurant.imageUrl.startsWith("https://placehold.co")) {
+    if (
+      restaurant.imageUrl &&
+      restaurant.imageUrl.startsWith("https://placehold.co")
+    ) {
       const firstCuisineId = restaurant.cuisine?.[0];
       if (firstCuisineId) {
-        const cuisineForHint = allCuisines.find(c => c.id === firstCuisineId);
+        const cuisineForHint = allCuisines.find((c) => c.id === firstCuisineId);
         if (cuisineForHint && cuisineForHint.name) {
           const words = cuisineForHint.name.split(" ");
           if (words.length > 0 && words[0].length > 2) {
@@ -196,7 +224,6 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     return undefined;
   }, [restaurant.imageUrl, restaurant.cuisine]);
 
-
   const restaurantLocation: LatLngExpression | undefined =
     restaurant.latitude !== undefined && restaurant.longitude !== undefined
       ? [restaurant.latitude, restaurant.longitude]
@@ -208,7 +235,6 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     }
     return undefined;
   }, [ActualDefaultIcon]);
-
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -228,7 +254,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <div className="flex-shrink-0">
             <Image
               src={restaurant.imageUrl}
-              alt={restaurant.name || 'Logo del restaurante'}
+              alt={restaurant.name || "Logo del restaurante"}
               width={64}
               height={64}
               className="rounded-md object-cover aspect-square"
@@ -249,17 +275,15 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             >
               {cuisineNames}
             </p>
-             {restaurant.address && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5 flex items-center">
-                    <MapPin size={12} className="mr-1 shrink-0" />
-                    {restaurant.address}
-                </p>
+            {restaurant.address && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5 flex items-center">
+                <MapPin size={12} className="mr-1 shrink-0" />
+                {restaurant.address}
+              </p>
             )}
           </div>
 
-          <div
-            className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto"
-          >
+          <div className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto">
             {isLoadingReviews && !isDialogOpen ? (
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
             ) : (
@@ -275,13 +299,13 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
-           <DialogDescription className="text-base">
-             {cuisineNames}
+          <DialogDescription className="text-base">
+            {cuisineNames}
           </DialogDescription>
           {restaurant.address && (
             <div className="flex items-center text-sm text-muted-foreground mt-1">
-                <MapPin size={14} className="mr-1.5 shrink-0" />
-                <span>{restaurant.address}</span>
+              <MapPin size={14} className="mr-1.5 shrink-0" />
+              <span>{restaurant.address}</span>
             </div>
           )}
           <div className="flex items-center pt-2">
@@ -292,34 +316,50 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </div>
         </DialogHeader>
 
-        {isDialogOpen && mapReadyDialog && restaurantLocation && L && ActualDefaultIcon && markerIconInstance && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
+        {isDialogOpen &&
+        mapReadyDialog &&
+        restaurantLocation &&
+        L &&
+        ActualDefaultIcon &&
+        markerIconInstance &&
+        LeafletMapContainer &&
+        LeafletTileLayer &&
+        LeafletMarker &&
+        LeafletPopup ? (
           <div className="my-4">
             <LeafletMapContainer
-              key={restaurant.id + (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")}
+              key={`${restaurant.id}-map-${isDialogOpen ? "open" : "closed"}`}
               center={restaurantLocation}
               zoom={15}
               scrollWheelZoom={false}
-              style={{ height: '200px', width: '100%', borderRadius: 'var(--radius)' }}
-              whenCreated={mapInstance => { mapRefDialog.current = mapInstance; }}
+              style={{
+                height: "200px",
+                width: "100%",
+                borderRadius: "var(--radius)",
+              }}
             >
               <LeafletTileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <LeafletMarker position={restaurantLocation} icon={markerIconInstance}>
+              <LeafletMarker
+                position={restaurantLocation}
+                icon={markerIconInstance}
+              >
                 <LeafletPopup>{restaurant.name}</LeafletPopup>
               </LeafletMarker>
             </LeafletMapContainer>
           </div>
-        ) : isDialogOpen && !mapReadyDialog && restaurantLocation && L ? ( // Show loader if L is loaded but map not fully ready
-             <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p className="ml-2">Cargando mapa...</p>
-            </div>
-        ) : isDialogOpen && mapReadyDialog && !restaurantLocation ? ( // Map ready but no location data
-            <p className="my-4 text-sm text-muted-foreground italic">La ubicación en el mapa no está disponible para este restaurante.</p>
+        ) : isDialogOpen && !mapReadyDialog && restaurantLocation && L ? (
+          <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="ml-2">Cargando mapa...</p>
+          </div>
+        ) : isDialogOpen && mapReadyDialog && !restaurantLocation ? (
+          <p className="my-4 text-sm text-muted-foreground italic">
+            La ubicación en el mapa no está disponible para este restaurante.
+          </p>
         ) : null}
-
 
         <Separator className="my-4" />
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
