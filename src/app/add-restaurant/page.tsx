@@ -632,7 +632,7 @@ export default function AddRestaurantPage() {
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
                         style={{
-                          height: "300px",
+                          height: "200px",
                           width: "100%",
                           borderRadius: "6px",
                         }}

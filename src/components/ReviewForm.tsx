@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm, SubmitHandler } from "react-hook-form";
@@ -79,7 +80,7 @@ export default function ReviewForm({
 
       onReviewAdded(newAppReview);
       form.reset();
-      form.setValue("rating", 0);
+      form.setValue("rating", 0); // Explicitly reset rating in form to 0
 
       queryClient.invalidateQueries({ queryKey: ["reviews", restaurantId] });
       queryClient.invalidateQueries({
@@ -148,6 +149,7 @@ export default function ReviewForm({
                   onRate={(rate) => {
                     field.onChange(rate);
                   }}
+                  size={24} // Increased star size
                 />
               </FormControl>
               <FormMessage />
@@ -165,7 +167,7 @@ export default function ReviewForm({
                   placeholder="Cuéntanos sobre tu experiencia..."
                   {...field}
                   rows={4}
-                  className="bg-card"
+                  className="bg-card focus-visible:border-primary"
                 />
               </FormControl>
               <FormMessage />
