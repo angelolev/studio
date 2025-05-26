@@ -25,6 +25,7 @@ export default function FloatingAddButton() {
           "Por favor, inicia sesión para agregar un nuevo restaurante.",
         action: (
           <Button
+            variant="outline"
             onClick={async () => {
               try {
                 await signInWithGoogle();
