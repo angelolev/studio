@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -35,12 +36,14 @@ import type {
   Icon as LeafletIconType,
   Map as LeafletMapType,
 } from "leaflet";
+import type leaflet from "leaflet"; // For L type
 import dynamic from "next/dynamic";
 
 // Import Leaflet marker images
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
 
 const LeafletMapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
@@ -78,10 +81,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const [L, setL] = useState<typeof import("leaflet") | null>(null);
+  const [L, setL] = useState<typeof leaflet | null>(null);
   const [ActualDefaultIcon, setActualDefaultIcon] = useState<
     typeof LeafletIconType.Default | null
   >(null);
+  const mapRefDialog = useRef<LeafletMapType | null>(null);
+
 
   const restaurantReviewsQueryKey = ["reviews", restaurant.id];
   const userReviewedQueryKey = ["userReviewed", restaurant.id, user?.uid];
@@ -94,7 +99,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     staleTime: 5 * 60 * 1000,
-    enabled: true,
+    enabled: true, // Fetch reviews as soon as card mounts
     select: (data) =>
       data.map((review) => ({
         ...review,
@@ -118,15 +123,18 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       import("leaflet")
         .then((leafletModule) => {
           if (!isMounted) return;
-          // Configure Leaflet's default icon
-          const DefaultIcon = leafletModule.Icon.Default as any;
-          if (!DefaultIcon.prototype._iconInit) {
+          if (!leafletModule.Icon.Default.prototype._iconInit) {
+            delete (leafletModule.Icon.Default.prototype as any)._getIconUrl;
             leafletModule.Icon.Default.mergeOptions({
               iconRetinaUrl: markerIcon2x.src,
               iconUrl: markerIcon.src,
               shadowUrl: markerShadow.src,
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41],
             });
-            DefaultIcon.prototype._iconInit = true;
+            leafletModule.Icon.Default.prototype._iconInit = true;
           }
           setL(leafletModule);
           setActualDefaultIcon(() => leafletModule.Icon.Default);
@@ -146,13 +154,19 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     };
   }, [isDialogOpen, L, toast]);
 
+
   useEffect(() => {
     if (isDialogOpen && L && ActualDefaultIcon) {
       setMapReadyDialog(true);
     } else if (!isDialogOpen) {
+      if (mapRefDialog.current) {
+        mapRefDialog.current.remove();
+        mapRefDialog.current = null;
+      }
       setMapReadyDialog(false);
     }
   }, [isDialogOpen, L, ActualDefaultIcon]);
+
 
   useEffect(() => {
     if (reviewsError) {
@@ -215,14 +229,20 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         if (cuisineForHint && cuisineForHint.name) {
           const words = cuisineForHint.name.split(" ");
           if (words.length > 0 && words[0].length > 2) {
-            return words[0].toLowerCase();
+            // Use first word if it's longer than 2 chars
+             const hint = words[0].toLowerCase();
+            if (words.length > 1 && words[1].length > 2) {
+              return `${hint} ${words[1].toLowerCase()}`; // Add second word if available and long enough
+            }
+            return hint;
           }
         }
       }
-      return "restaurante logo";
+      return "restaurante logo"; // Default for placeholders if cuisine hint fails
     }
-    return undefined;
+    return undefined; // No hint for non-placeholder images
   }, [restaurant.imageUrl, restaurant.cuisine]);
+
 
   const restaurantLocation: LatLngExpression | undefined =
     restaurant.latitude !== undefined && restaurant.longitude !== undefined
@@ -238,76 +258,75 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <DialogTrigger asChild>
-        <Card
-          className="flex items-center p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg w-full cursor-pointer"
-          aria-label={`Ver detalles y opiniones de ${restaurant.name}`}
-          role="button"
-          tabIndex={0}
-          onClick={() => setIsDialogOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              setIsDialogOpen(true);
-            }
-          }}
-        >
-          <div className="flex-shrink-0">
-            <Image
-              src={restaurant.imageUrl}
-              alt={restaurant.name || "Logo del restaurante"}
-              width={64}
-              height={64}
-              className="rounded-md object-cover aspect-square"
-              data-ai-hint={imageHint}
-            />
-          </div>
+      <Card
+        className="flex items-center p-3 sm:p-4 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg w-full cursor-pointer"
+        aria-label={`Ver detalles y opiniones de ${restaurant.name}`}
+        role="button"
+        tabIndex={0}
+        onClick={() => setIsDialogOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            setIsDialogOpen(true);
+          }
+        }}
+      >
+        <div className="flex-shrink-0">
+          <Image
+            src={restaurant.imageUrl}
+            alt={restaurant.name || "Logo del restaurante"}
+            width={64}
+            height={64}
+            className="rounded-md object-cover aspect-square"
+            data-ai-hint={imageHint}
+          />
+        </div>
 
-          <div className="ml-3 sm:ml-4 flex-grow min-w-0 pr-2">
-            <h3
-              className="text-base sm:text-lg font-semibold truncate"
-              title={restaurant.name}
-            >
-              {restaurant.name}
-            </h3>
-            <p
-              className="text-xs sm:text-sm text-muted-foreground truncate"
-              title={cuisineNames}
-            >
-              {cuisineNames}
+        <div className="ml-3 sm:ml-4 flex-grow min-w-0 pr-2">
+          <h3
+            className="text-base sm:text-lg font-semibold truncate"
+            title={restaurant.name}
+          >
+            {restaurant.name}
+          </h3>
+          <p
+            className="text-xs sm:text-sm text-muted-foreground truncate"
+            title={cuisineNames}
+          >
+            {cuisineNames}
+          </p>
+          {restaurant.address && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5 flex items-center">
+              <MapPin size={12} className="mr-1 shrink-0" />
+              {restaurant.address}
             </p>
-            {restaurant.address && (
-              <p className="text-xs text-muted-foreground truncate mt-0.5 flex items-center">
-                <MapPin size={12} className="mr-1 shrink-0" />
-                {restaurant.address}
-              </p>
-            )}
-          </div>
+          )}
+        </div>
 
-          <div className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto">
-            {isLoadingReviews && !isDialogOpen ? (
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            ) : (
-              <StarRating rating={averageRating} readOnly size={16} />
-            )}
-            <span className="text-xs text-muted-foreground mt-0.5">
-              ({reviewCount} opinion{reviewCount === 1 ? "" : "es"})
-            </span>
-          </div>
-        </Card>
-      </DialogTrigger>
+        <div className="ml-auto flex-shrink-0 flex flex-col items-center text-center p-1 sm:p-2 h-auto">
+          {isLoadingReviews && !isDialogOpen ? ( // Only show card loader if dialog is NOT open
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          ) : (
+            <StarRating rating={averageRating} readOnly size={16} />
+          )}
+          <span className="text-xs text-muted-foreground mt-0.5">
+            ({reviewCount} opinion{reviewCount === 1 ? "" : "es"})
+          </span>
+        </div>
+      </Card>
 
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
           <DialogDescription className="text-base">
             {cuisineNames}
+            {restaurant.address && (
+              <span className="block text-sm text-muted-foreground mt-1">
+                <MapPin size={14} className="inline-block mr-1.5 shrink-0 -mt-0.5" />
+                {restaurant.address}
+              </span>
+            )}
           </DialogDescription>
-          {restaurant.address && (
-            <div className="flex items-center text-sm text-muted-foreground mt-1">
-              <MapPin size={14} className="mr-1.5 shrink-0" />
-              <span>{restaurant.address}</span>
-            </div>
-          )}
+          
           <div className="flex items-center pt-2">
             <StarRating rating={averageRating} readOnly />
             <span className="ml-2 text-sm text-muted-foreground">
@@ -316,27 +335,19 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </div>
         </DialogHeader>
 
-        {isDialogOpen &&
-        mapReadyDialog &&
-        restaurantLocation &&
-        L &&
-        ActualDefaultIcon &&
-        markerIconInstance &&
-        LeafletMapContainer &&
-        LeafletTileLayer &&
-        LeafletMarker &&
-        LeafletPopup ? (
+        {isDialogOpen && mapReadyDialog && restaurantLocation && L && ActualDefaultIcon && markerIconInstance && LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup ? (
           <div className="my-4">
             <LeafletMapContainer
-              key={`${restaurant.id}-map-${isDialogOpen ? "open" : "closed"}`}
+              key={restaurant.id + (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")}
               center={restaurantLocation}
-              zoom={15}
+              zoom={17}
               scrollWheelZoom={false}
               style={{
                 height: "200px",
                 width: "100%",
                 borderRadius: "var(--radius)",
               }}
+              whenCreated={(mapInstance) => { mapRefDialog.current = mapInstance; }}
             >
               <LeafletTileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -360,6 +371,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             La ubicación en el mapa no está disponible para este restaurante.
           </p>
         ) : null}
+
 
         <Separator className="my-4" />
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
