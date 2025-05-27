@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -40,6 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Restaurant } from "@/types";
 import { addRestaurantToFirestore } from "@/lib/firestoreService";
 import { cuisines as allCuisines } from "@/data/cuisines";
+import { configureLeafletDefaultIcon } from "@/lib/leaflet-config";
 import {
   Loader2,
   Camera,
@@ -48,14 +50,13 @@ import {
   ArrowLeft,
   LocateFixed,
 } from "lucide-react";
-import { configureLeafletDefaultIcon } from "@/lib/leaflet-config";
 
 const LeafletMapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   {
     ssr: false,
     loading: () => (
-      <div className="h-[300px] w-full flex items-center justify-center bg-muted rounded-md">
+      <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="ml-2">Cargando mapa...</p>
       </div>
@@ -78,7 +79,8 @@ const DynamicLeafletPopup = dynamic(
 interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
-  icon: LeafletIconType | null;
+  iconInstance: LeafletIconType | null;
+  L: typeof import("leaflet") | null;
   MarkerComponent: typeof DynamicLeafletMarker | null;
   PopupComponent: typeof DynamicLeafletPopup | null;
 }
@@ -86,7 +88,8 @@ interface LocationMarkerProps {
 function LocationMarker({
   position,
   onMapClick,
-  icon,
+  iconInstance,
+  L,
   MarkerComponent,
   PopupComponent,
 }: LocationMarkerProps) {
@@ -94,15 +97,17 @@ function LocationMarker({
 
   useMapEvents({
     click(e) {
-      onMapClick(e.latlng as LatLng);
+      if (L) {
+        onMapClick(L.latLng(e.latlng.lat, e.latlng.lng));
+      }
     },
   });
 
-  if (!position || !icon || !MarkerComponent || !PopupComponent) {
+  if (!position || !iconInstance || !MarkerComponent || !PopupComponent) {
     return null;
   }
   return (
-    <MarkerComponent position={position} icon={icon}>
+    <MarkerComponent position={position} icon={iconInstance}>
       <PopupComponent>Has seleccionado esta ubicación</PopupComponent>
     </MarkerComponent>
   );
@@ -159,9 +164,7 @@ export default function AddRestaurantPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [L, setL] = useState<typeof import("leaflet") | null>(null);
-  const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(
-    null
-  );
+  const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(
@@ -180,9 +183,7 @@ export default function AddRestaurantPage() {
   const [currentStream, setCurrentStream] = useState<MediaStream | null>(null);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
-  const [selectedMapPosition, setSelectedMapPosition] = useState<LatLng | null>(
-    null
-  );
+  const [selectedMapPosition, setSelectedMapPosition] = useState<LatLng | null>(null);
 
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
@@ -194,7 +195,7 @@ export default function AddRestaurantPage() {
     },
   });
 
-  useEffect(() => {
+ useEffect(() => {
     if (!mapReady) {
       import("leaflet")
         .then((leafletModule) => {
@@ -202,7 +203,7 @@ export default function AddRestaurantPage() {
           const icon = new leafletModule.Icon.Default();
           setL(leafletModule);
           setMapMarkerIcon(icon);
-          setMapReady(true);
+          setMapReady(true); // Set mapReady after L and icon are set
         })
         .catch((error) => {
           console.error("Failed to load Leaflet module", error);
@@ -215,13 +216,13 @@ export default function AddRestaurantPage() {
     }
   }, [mapReady, toast]);
 
+
   useEffect(() => {
     if (
       mapReady &&
       L &&
       navigator.geolocation &&
-      form &&
-      !form.getValues("latitude") &&
+      !form.getValues("latitude") && // Only if not already set
       !form.getValues("longitude")
     ) {
       navigator.geolocation.getCurrentPosition(
@@ -237,14 +238,15 @@ export default function AddRestaurantPage() {
         },
         (error) => {
           console.warn(`Error obteniendo geolocalización: ${error.message}`);
-          if (mapRef.current) {
+           if (mapRef.current) {
             mapRef.current.flyTo(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
           }
         },
         { timeout: 10000 }
       );
     }
-  }, [mapReady, L, form]);
+  }, [mapReady, L, form]); // Added form to dependencies as getValues is used
+
 
   useEffect(() => {
     if (!loadingAuthState && !user) {
@@ -370,8 +372,9 @@ export default function AddRestaurantPage() {
       setImagePreview(null);
       setSelectedMapPosition(null);
       setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
-      if (mapRef.current)
+       if (mapRef.current) { // Ensure mapRef.current exists
         mapRef.current.setView(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
+      }
       router.push("/");
     },
     onError: (error) => {
@@ -433,7 +436,7 @@ export default function AddRestaurantPage() {
   };
 
   const centerMapOnUser = () => {
-    if (!mapReady || !L) {
+     if (!mapReady || !L) {
       toast({
         title: "Mapa no listo",
         description: "Por favor, espera a que el mapa cargue.",
@@ -515,7 +518,8 @@ export default function AddRestaurantPage() {
     : currentMapCenter;
 
   return (
-    <div className="max-w-2xl mx-auto pb-8">
+    // Added pb-28 for the sticky footer space
+    <div className="max-w-2xl mx-auto pb-28 relative"> {/* Added relative for z-index context if needed later */}
       <div className="mb-6">
         <Link href="/" passHref legacyBehavior>
           <Button variant="outline" size="sm">
@@ -536,7 +540,7 @@ export default function AddRestaurantPage() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} id="add-restaurant-form" className="space-y-6">
               <FormField
                 control={form.control}
                 name="name"
@@ -609,7 +613,7 @@ export default function AddRestaurantPage() {
                 name="latitude"
                 render={({ fieldState: latitudeFieldState }) => (
                   <FormItem>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-1">
                       <FormLabel>Ubicación en el Mapa</FormLabel>
                       <Button
                         type="button"
@@ -627,20 +631,15 @@ export default function AddRestaurantPage() {
                       Haz clic en el mapa para seleccionar la ubicación del
                       restaurante.
                     </FormDescription>
-                    {mapReady &&
-                    L &&
-                    mapMarkerIcon &&
-                    LeafletMapContainer &&
-                    LeafletTileLayer &&
-                    DynamicLeafletMarker &&
-                    DynamicLeafletPopup ? (
+                     {mapReady && L && mapMarkerIcon && LeafletMapContainer && LeafletTileLayer && DynamicLeafletMarker && DynamicLeafletPopup ? (
                       <LeafletMapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
                         style={{
-                          height: "200px",
+                          height: "250px", // Increased height for better usability
                           width: "100%",
                           borderRadius: "6px",
+                          zIndex: 0, // Attempt to keep map under other UI elements if overlap issues occur
                         }}
                         scrollWheelZoom={true}
                         ref={mapRef}
@@ -649,17 +648,17 @@ export default function AddRestaurantPage() {
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
-
                         <LocationMarker
                           position={selectedMapPosition}
                           onMapClick={handleMapClick}
-                          icon={mapMarkerIcon}
+                          iconInstance={mapMarkerIcon}
+                          L={L}
                           MarkerComponent={DynamicLeafletMarker}
                           PopupComponent={DynamicLeafletPopup}
                         />
                       </LeafletMapContainer>
                     ) : (
-                      <div className="h-[300px] w-full flex items-center justify-center bg-muted rounded-md">
+                      <div className="h-[250px] w-full flex items-center justify-center bg-muted rounded-md">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         <p className="ml-2">Cargando mapa...</p>
                       </div>
@@ -706,9 +705,9 @@ export default function AddRestaurantPage() {
                       className="w-full h-full object-cover"
                       autoPlay
                       muted
-                      playsInline // Important for iOS
+                      playsInline
                     />
-                    {hasCameraPermission === false && ( // Show if explicitly denied or error
+                    {hasCameraPermission === false && (
                       <Alert
                         variant="destructive"
                         className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4"
@@ -753,7 +752,7 @@ export default function AddRestaurantPage() {
                     render={({ field: imageField }) => (
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
-                        <div className="flex sm:flex-row gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <Button
                             type="button"
                             onClick={openCamera}
@@ -768,8 +767,7 @@ export default function AddRestaurantPage() {
                             className="flex-1"
                             onClick={() => fileUploadInputRef.current?.click()}
                           >
-                            <UploadCloud className="mr-2 h-4 w-4" /> Subir
-                            Imagen
+                            <UploadCloud className="mr-2 h-4 w-4" /> Subir Imagen
                           </Button>
                           <FormControl>
                             <Input
@@ -795,8 +793,7 @@ export default function AddRestaurantPage() {
                           </FormControl>
                         </div>
                         <FormDescription>
-                          Toma una foto o sube una imagen (JPG, PNG, WebP, max
-                          5MB).
+                          Toma una foto o sube una imagen (JPG, PNG, WebP, max 5MB).
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -817,34 +814,41 @@ export default function AddRestaurantPage() {
                   )}
                 </>
               )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                variant="outline"
-                disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
-              >
-                {mutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Agregando...
-                  </>
-                ) : (
-                  "Agregar Restaurante"
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push("/")}
-                className="w-full botder-t"
-                style={{ backgroundColor: "#e74c3c" }}
-              >
-                Cerrar
-              </Button>
+              {/* Submit buttons moved to sticky footer */}
             </form>
           </Form>
         </CardContent>
       </Card>
+
+      {/* Sticky Footer for Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 shadow-lg z-30
+                      md:left-1/2 md:-translate-x-1/2 md:max-w-2xl md:rounded-t-lg">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button
+            type="submit"
+            form="add-restaurant-form" // Link to the form by its ID
+            className="flex-1" // Use flex-1 for equal width on sm screens
+            variant="default" // Changed from outline to default for primary action
+            disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
+          >
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Agregando...
+              </>
+            ) : (
+              "Agregar Restaurante"
+            )}
+          </Button>
+          <Button
+            variant="destructive" // Changed to destructive for more contrast
+            onClick={() => router.push("/")}
+            className="flex-1" // Use flex-1 for equal width on sm screens
+          >
+            Cerrar
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
