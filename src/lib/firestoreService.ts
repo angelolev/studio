@@ -13,6 +13,7 @@ import {
   getCountFromServer,
   getDocs,
   serverTimestamp,
+  limit, // Import limit
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Firebase Storage imports
 import { v4 as uuidv4 } from 'uuid';
@@ -138,7 +139,7 @@ export async function checkIfUserReviewed(
 export interface RestaurantFirestoreData {
   name: string;
   cuisine: string[];
-  address?: string; // Made optional
+  address?: string; 
   latitude: number;
   longitude: number;
   imageUrl: string;
@@ -214,4 +215,14 @@ export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]
       description: data.description,
     } as AppRestaurantType;
   });
+}
+
+export async function checkRestaurantExistsByName(name: string): Promise<boolean> {
+  const restaurantColRef = collection(db, "restaurants");
+  // Firestore queries are case-sensitive for '=='
+  // For a true case-insensitive check, you'd typically store a normalized (e.g., lowercase)
+  // version of the name and query against that. This is an exact match check.
+  const q = query(restaurantColRef, where("name", "==", name), limit(1));
+  const querySnapshot = await getDocs(q);
+  return !querySnapshot.empty;
 }

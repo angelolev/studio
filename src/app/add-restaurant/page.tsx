@@ -14,6 +14,7 @@ import type {
   LatLng,
   Map as LeafletMapType,
   Icon as LeafletIconType,
+  IconOptions as LeafletIconOptionsType,
 } from "leaflet";
 import dynamic from "next/dynamic";
 
@@ -35,11 +36,26 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertDescription as UIAlertDescription, // Renamed to avoid conflict
+  AlertTitle as UIAlertTitle, // Renamed to avoid conflict
+} from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { Restaurant } from "@/types";
-import { addRestaurantToFirestore } from "@/lib/firestoreService";
+import { addRestaurantToFirestore, checkRestaurantExistsByName } from "@/lib/firestoreService"; // Import checkRestaurantExistsByName
 import { cuisines as allCuisines } from "@/data/cuisines";
 import { configureLeafletDefaultIcon } from "@/lib/leaflet-config";
 import {
@@ -51,12 +67,13 @@ import {
   LocateFixed,
 } from "lucide-react";
 
+// Dynamic imports for Leaflet components
 const LeafletMapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   {
     ssr: false,
     loading: () => (
-      <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md">
+      <div className="h-[250px] w-full flex items-center justify-center bg-muted rounded-md">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="ml-2">Cargando mapa...</p>
       </div>
@@ -79,7 +96,7 @@ const DynamicLeafletPopup = dynamic(
 interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
-  iconInstance: LeafletIconType | null;
+  icon: LeafletIconType | null; // Expecting an instance
   L: typeof import("leaflet") | null;
   MarkerComponent: typeof DynamicLeafletMarker | null;
   PopupComponent: typeof DynamicLeafletPopup | null;
@@ -88,7 +105,7 @@ interface LocationMarkerProps {
 function LocationMarker({
   position,
   onMapClick,
-  iconInstance,
+  icon,
   L,
   MarkerComponent,
   PopupComponent,
@@ -103,11 +120,12 @@ function LocationMarker({
     },
   });
 
-  if (!position || !iconInstance || !MarkerComponent || !PopupComponent) {
+  if (!position || !icon || !MarkerComponent || !PopupComponent) {
     return null;
   }
+
   return (
-    <MarkerComponent position={position} icon={iconInstance}>
+    <MarkerComponent position={position} icon={icon}>
       <PopupComponent>Has seleccionado esta ubicación</PopupComponent>
     </MarkerComponent>
   );
@@ -161,12 +179,11 @@ export default function AddRestaurantPage() {
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [L, setL] = useState<typeof import("leaflet") | null>(null);
   const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(null);
   const [mapReady, setMapReady] = useState(false);
-
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(
     DEFAULT_MAP_CENTER_LIMA
   );
@@ -185,6 +202,10 @@ export default function AddRestaurantPage() {
 
   const [selectedMapPosition, setSelectedMapPosition] = useState<LatLng | null>(null);
 
+  // State for duplicate name alert
+  const [isDuplicateAlertOpen, setIsDuplicateAlertOpen] = useState(false);
+  const [restaurantDataForSubmission, setRestaurantDataForSubmission] = useState<AddRestaurantFormData | null>(null);
+
   const form = useForm<AddRestaurantFormData>({
     resolver: zodResolver(addRestaurantSchema),
     defaultValues: {
@@ -195,7 +216,7 @@ export default function AddRestaurantPage() {
     },
   });
 
- useEffect(() => {
+  useEffect(() => {
     if (!mapReady) {
       import("leaflet")
         .then((leafletModule) => {
@@ -203,7 +224,7 @@ export default function AddRestaurantPage() {
           const icon = new leafletModule.Icon.Default();
           setL(leafletModule);
           setMapMarkerIcon(icon);
-          setMapReady(true); // Set mapReady after L and icon are set
+          setMapReady(true);
         })
         .catch((error) => {
           console.error("Failed to load Leaflet module", error);
@@ -222,7 +243,7 @@ export default function AddRestaurantPage() {
       mapReady &&
       L &&
       navigator.geolocation &&
-      !form.getValues("latitude") && // Only if not already set
+      !form.getValues("latitude") && 
       !form.getValues("longitude")
     ) {
       navigator.geolocation.getCurrentPosition(
@@ -245,7 +266,7 @@ export default function AddRestaurantPage() {
         { timeout: 10000 }
       );
     }
-  }, [mapReady, L, form]); // Added form to dependencies as getValues is used
+  }, [mapReady, L, form]);
 
 
   useEffect(() => {
@@ -271,7 +292,6 @@ export default function AddRestaurantPage() {
       setIsTakingPhoto(false);
       return null;
     }
-
     try {
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -296,12 +316,10 @@ export default function AddRestaurantPage() {
   const openCamera = async () => {
     setIsTakingPhoto(true);
     setIsCameraOpen(true);
-
     if (currentStream) {
       currentStream.getTracks().forEach((track) => track.stop());
       setCurrentStream(null);
     }
-
     const newStream = await requestCameraAccess();
     if (newStream) {
       setCurrentStream(newStream);
@@ -372,7 +390,7 @@ export default function AddRestaurantPage() {
       setImagePreview(null);
       setSelectedMapPosition(null);
       setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
-       if (mapRef.current) { // Ensure mapRef.current exists
+       if (mapRef.current) {
         mapRef.current.setView(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
       }
       router.push("/");
@@ -388,7 +406,7 @@ export default function AddRestaurantPage() {
     },
   });
 
-  const onSubmit: SubmitHandler<AddRestaurantFormData> = (data) => {
+  const proceedWithSubmission = (data: AddRestaurantFormData) => {
     if (!user) return;
     const { image, ...restaurantData } = data;
     const imageFile = image instanceof File ? image : undefined;
@@ -415,6 +433,16 @@ export default function AddRestaurantPage() {
       return;
     }
     mutation.mutate({ restaurantData, imageFile });
+  }
+
+  const onSubmit: SubmitHandler<AddRestaurantFormData> = async (data) => {
+    const exists = await checkRestaurantExistsByName(data.name);
+    if (exists) {
+      setRestaurantDataForSubmission(data);
+      setIsDuplicateAlertOpen(true);
+    } else {
+      proceedWithSubmission(data);
+    }
   };
 
   const handleImageFileChange = (
@@ -518,8 +546,7 @@ export default function AddRestaurantPage() {
     : currentMapCenter;
 
   return (
-    // Added pb-28 for the sticky footer space
-    <div className="max-w-2xl mx-auto pb-28 relative"> {/* Added relative for z-index context if needed later */}
+    <div className="max-w-2xl mx-auto pb-28 relative">
       <div className="mb-6">
         <Link href="/" passHref legacyBehavior>
           <Button variant="outline" size="sm">
@@ -636,10 +663,10 @@ export default function AddRestaurantPage() {
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
                         style={{
-                          height: "250px", // Increased height for better usability
+                          height: "250px",
                           width: "100%",
                           borderRadius: "6px",
-                          zIndex: 0, // Attempt to keep map under other UI elements if overlap issues occur
+                          zIndex: 0, 
                         }}
                         scrollWheelZoom={true}
                         ref={mapRef}
@@ -651,7 +678,7 @@ export default function AddRestaurantPage() {
                         <LocationMarker
                           position={selectedMapPosition}
                           onMapClick={handleMapClick}
-                          iconInstance={mapMarkerIcon}
+                          icon={mapMarkerIcon}
                           L={L}
                           MarkerComponent={DynamicLeafletMarker}
                           PopupComponent={DynamicLeafletPopup}
@@ -708,16 +735,16 @@ export default function AddRestaurantPage() {
                       playsInline
                     />
                     {hasCameraPermission === false && (
-                      <Alert
+                      <UIAlert
                         variant="destructive"
                         className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4"
                       >
                         <VideoOff className="mr-2 h-5 w-5" />
-                        <AlertTitle>Acceso a Cámara Denegado</AlertTitle>
-                        <AlertDescription>
+                        <UIAlertTitle>Acceso a Cámara Denegado</UIAlertTitle>
+                        <UIAlertDescription>
                           Revisa los permisos de cámara de tu navegador.
-                        </AlertDescription>
-                      </Alert>
+                        </UIAlertDescription>
+                      </UIAlert>
                     )}
                   </div>
                   <canvas ref={canvasRef} className="hidden"></canvas>
@@ -814,21 +841,19 @@ export default function AddRestaurantPage() {
                   )}
                 </>
               )}
-              {/* Submit buttons moved to sticky footer */}
             </form>
           </Form>
         </CardContent>
       </Card>
 
-      {/* Sticky Footer for Buttons */}
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 shadow-lg z-30
                       md:left-1/2 md:-translate-x-1/2 md:max-w-2xl md:rounded-t-lg">
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
             type="submit"
-            form="add-restaurant-form" // Link to the form by its ID
-            className="flex-1" // Use flex-1 for equal width on sm screens
-            variant="outline" // Changed from outline to default for primary action
+            form="add-restaurant-form" 
+            className="flex-1" 
+            variant="default"
             disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
           >
             {mutation.isPending ? (
@@ -841,14 +866,41 @@ export default function AddRestaurantPage() {
             )}
           </Button>
           <Button
-            variant="destructive" // Changed to destructive for more contrast
+            variant="destructive" 
             onClick={() => router.push("/")}
-            className="flex-1" // Use flex-1 for equal width on sm screens
+            className="flex-1" 
           >
             Cerrar
           </Button>
         </div>
       </div>
+      
+      <AlertDialog open={isDuplicateAlertOpen} onOpenChange={setIsDuplicateAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restaurante Duplicado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ya existe un restaurante con el nombre "{restaurantDataForSubmission?.name}".
+              ¿Estás seguro de que quieres agregarlo de todas formas?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRestaurantDataForSubmission(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (restaurantDataForSubmission) {
+                  proceedWithSubmission(restaurantDataForSubmission);
+                }
+                setIsDuplicateAlertOpen(false);
+                setRestaurantDataForSubmission(null);
+              }}
+            >
+              Continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
