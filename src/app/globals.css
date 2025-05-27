@@ -9,7 +9,7 @@ body {
 
 @layer base {
   :root {
-    /* New Palette based on #7F55B1 (Purple Primary) */
+    /* Palette based on #7F55B1 (Purple Primary) */
     --background: 270 40% 98%; /* Very light, almost white lavender */
     --foreground: 270 10% 20%; /* Dark, desaturated purple-grey */
 
@@ -66,8 +66,9 @@ body {
     --popover: 220 20% 15%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 16 100% 65%; 
-    --primary-foreground: 16 80% 10%;
+    /* Updated Dark Mode Primary to Purple */
+    --primary: 270 38% 51%; /* #7F55B1 */
+    --primary-foreground: 270 30% 95%; /* Light purple for text on primary */
 
     --secondary: 220 15% 25%;
     --secondary-foreground: 0 0% 98%;
@@ -75,15 +76,16 @@ body {
     --muted: 220 15% 25%;
     --muted-foreground: 0 0% 63.9%;
 
+    /* Accent remains orange for contrast, can be adjusted if needed */
     --accent: 42 100% 55%;
     --accent-foreground: 42 100% 10%;
 
-    --destructive: 0 70% 50%;
+    --destructive: 0 70% 50%; /* Darker red for dark mode */
     --destructive-foreground: 0 0% 98%;
 
     --border: 220 15% 30%;
     --input: 220 15% 30%;
-    --ring: 16 100% 65%;
+    --ring: 270 38% 51%; /* Updated ring to purple */
     
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -92,7 +94,7 @@ body {
     --chart-5: 340 75% 55%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 224.3 76.3% 48%; /* Sidebar primary can be different if desired */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;

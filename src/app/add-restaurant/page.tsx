@@ -14,7 +14,6 @@ import type {
   LatLng,
   Map as LeafletMapType,
   Icon as LeafletIconType,
-  IconOptions as LeafletIconOptionsType,
 } from "leaflet";
 import dynamic from "next/dynamic";
 
@@ -38,8 +37,8 @@ import {
 } from "@/components/ui/form";
 import {
   Alert,
-  AlertDescription as UIAlertDescription, // Renamed to avoid conflict
-  AlertTitle as UIAlertTitle, // Renamed to avoid conflict
+  AlertDescription as UIAlertDescription,
+  AlertTitle as UIAlertTitle,
 } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -50,12 +49,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { Restaurant } from "@/types";
-import { addRestaurantToFirestore, checkRestaurantExistsByName } from "@/lib/firestoreService"; // Import checkRestaurantExistsByName
+import { addRestaurantToFirestore, checkRestaurantExistsByName } from "@/lib/firestoreService";
 import { cuisines as allCuisines } from "@/data/cuisines";
 import { configureLeafletDefaultIcon } from "@/lib/leaflet-config";
 import {
@@ -96,7 +94,7 @@ const DynamicLeafletPopup = dynamic(
 interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
-  icon: LeafletIconType | null; // Expecting an instance
+  icon: LeafletIconType | null;
   L: typeof import("leaflet") | null;
   MarkerComponent: typeof DynamicLeafletMarker | null;
   PopupComponent: typeof DynamicLeafletPopup | null;
@@ -181,7 +179,7 @@ export default function AddRestaurantPage() {
   const queryClient = useQueryClient();
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [L, setL] = useState<typeof import("leaflet") | null>(null);
+  const [LModule, setLModule] = useState<typeof import("leaflet") | null>(null);
   const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(
@@ -202,7 +200,6 @@ export default function AddRestaurantPage() {
 
   const [selectedMapPosition, setSelectedMapPosition] = useState<LatLng | null>(null);
 
-  // State for duplicate name alert
   const [isDuplicateAlertOpen, setIsDuplicateAlertOpen] = useState(false);
   const [restaurantDataForSubmission, setRestaurantDataForSubmission] = useState<AddRestaurantFormData | null>(null);
 
@@ -222,7 +219,7 @@ export default function AddRestaurantPage() {
         .then((leafletModule) => {
           configureLeafletDefaultIcon(leafletModule);
           const icon = new leafletModule.Icon.Default();
-          setL(leafletModule);
+          setLModule(leafletModule);
           setMapMarkerIcon(icon);
           setMapReady(true);
         })
@@ -241,14 +238,14 @@ export default function AddRestaurantPage() {
   useEffect(() => {
     if (
       mapReady &&
-      L &&
+      LModule &&
       navigator.geolocation &&
       !form.getValues("latitude") && 
       !form.getValues("longitude")
     ) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const userLatLng = L.latLng(
+          const userLatLng = LModule.latLng(
             position.coords.latitude,
             position.coords.longitude
           );
@@ -266,7 +263,7 @@ export default function AddRestaurantPage() {
         { timeout: 10000 }
       );
     }
-  }, [mapReady, L, form]);
+  }, [mapReady, LModule, form]);
 
 
   useEffect(() => {
@@ -464,7 +461,7 @@ export default function AddRestaurantPage() {
   };
 
   const centerMapOnUser = () => {
-     if (!mapReady || !L) {
+     if (!mapReady || !LModule) {
       toast({
         title: "Mapa no listo",
         description: "Por favor, espera a que el mapa cargue.",
@@ -475,7 +472,7 @@ export default function AddRestaurantPage() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const userLatLng = L.latLng(
+          const userLatLng = LModule.latLng(
             position.coords.latitude,
             position.coords.longitude
           );
@@ -648,7 +645,7 @@ export default function AddRestaurantPage() {
                         size="sm"
                         onClick={centerMapOnUser}
                         className="gap-1.5"
-                        disabled={!mapReady || !L}
+                        disabled={!mapReady || !LModule}
                       >
                         <LocateFixed size={16} />
                         Usar mi ubicación
@@ -658,7 +655,7 @@ export default function AddRestaurantPage() {
                       Haz clic en el mapa para seleccionar la ubicación del
                       restaurante.
                     </FormDescription>
-                     {mapReady && L && mapMarkerIcon && LeafletMapContainer && LeafletTileLayer && DynamicLeafletMarker && DynamicLeafletPopup ? (
+                     {mapReady && LModule && mapMarkerIcon && LeafletMapContainer && LeafletTileLayer && DynamicLeafletMarker && DynamicLeafletPopup ? (
                       <LeafletMapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
@@ -679,7 +676,7 @@ export default function AddRestaurantPage() {
                           position={selectedMapPosition}
                           onMapClick={handleMapClick}
                           icon={mapMarkerIcon}
-                          L={L}
+                          L={LModule}
                           MarkerComponent={DynamicLeafletMarker}
                           PopupComponent={DynamicLeafletPopup}
                         />
@@ -852,8 +849,7 @@ export default function AddRestaurantPage() {
           <Button
             type="submit"
             form="add-restaurant-form" 
-            className="flex-1" 
-            variant="default"
+            className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" 
             disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
           >
             {mutation.isPending ? (
@@ -885,7 +881,12 @@ export default function AddRestaurantPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setRestaurantDataForSubmission(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel 
+              onClick={() => setRestaurantDataForSubmission(null)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (restaurantDataForSubmission) {
@@ -894,6 +895,7 @@ export default function AddRestaurantPage() {
                 setIsDuplicateAlertOpen(false);
                 setRestaurantDataForSubmission(null);
               }}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Continuar
             </AlertDialogAction>
@@ -904,3 +906,4 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
+
