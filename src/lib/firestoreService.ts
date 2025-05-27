@@ -27,6 +27,7 @@ export interface ReviewFirestoreData {
   text: string;
   timestamp: Timestamp | ReturnType<typeof serverTimestamp>;
   restaurantId: string;
+  imageUrl?: string; // Optional image URL
 }
 
 export interface ReviewWithId extends ReviewFirestoreData {
@@ -38,6 +39,7 @@ export interface ReviewWithNumericTimestamp
   extends Omit<ReviewFirestoreData, "timestamp"> {
   id: string;
   timestamp: number;
+  imageUrl?: string;
 }
 
 export interface AddedReviewPlain {
@@ -49,20 +51,38 @@ export interface AddedReviewPlain {
   text: string;
   restaurantId: string;
   timestamp: number;
+  imageUrl?: string;
 }
 
 export async function addReviewToFirestore(
   restaurantId: string,
-  reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId">
+  reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">, // imageUrl will be handled internally
+  imageFile?: File
 ): Promise<AddedReviewPlain> {
   if (!reviewData.userId) {
     throw new Error("Se requiere ID de usuario para agregar una opinión.");
   }
+
+  let reviewImageUrl: string | undefined = undefined;
+  if (imageFile) {
+    const imageName = `${uuidv4()}-${imageFile.name}`;
+    // Path: review-images/{restaurantId}/{userId}/{imageName}
+    const imageStorageRef = ref(storage, `review-images/${restaurantId}/${reviewData.userId}/${imageName}`);
+    try {
+      const snapshot = await uploadBytes(imageStorageRef, imageFile);
+      reviewImageUrl = await getDownloadURL(snapshot.ref);
+    } catch (error) {
+      console.error("Error uploading review image to Firebase Storage: ", error);
+      // Not throwing error here, review can still be submitted without image
+    }
+  }
+
   const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
-  const docData: ReviewFirestoreData = { // Ensure correct type here
+  const docData: ReviewFirestoreData = {
     ...reviewData,
     restaurantId,
     timestamp: serverTimestamp(),
+    ...(reviewImageUrl && { imageUrl: reviewImageUrl }), // Add imageUrl only if it exists
   };
   const docRef = await addDoc(reviewsColRef, docData);
   const clientTimestampMillis = Date.now();
@@ -75,6 +95,7 @@ export async function addReviewToFirestore(
     text: reviewData.text,
     restaurantId,
     timestamp: clientTimestampMillis,
+    ...(reviewImageUrl && { imageUrl: reviewImageUrl }),
   };
 }
 
@@ -85,12 +106,18 @@ export async function getReviewsFromFirestore(
   const q = query(reviewsColRef, orderBy("timestamp", "desc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    const timestamp = data.timestamp as Timestamp | null; // Firestore timestamp can be null before server commits
+    const data = doc.data() as ReviewFirestoreData; // Use ReviewFirestoreData
+    const timestamp = data.timestamp as Timestamp | null;
     return {
       id: doc.id,
-      ...data,
-      timestamp: timestamp ? timestamp.toMillis() : Date.now(), // Handle potential null timestamp
+      userId: data.userId,
+      userName: data.userName,
+      userPhotoUrl: data.userPhotoUrl,
+      rating: data.rating,
+      text: data.text,
+      restaurantId: data.restaurantId,
+      imageUrl: data.imageUrl,
+      timestamp: timestamp ? timestamp.toMillis() : Date.now(),
     } as ReviewWithNumericTimestamp;
   });
 }
@@ -120,11 +147,11 @@ export interface RestaurantFirestoreData {
 }
 
 export async function addRestaurantToFirestore(
-  restaurantData: Omit<AppRestaurantType, 'id' | 'imageUrl' | 'description'>, // imageUrl and description will be generated
+  restaurantData: Omit<AppRestaurantType, 'id' | 'imageUrl' | 'description'>,
   imageFile?: File
 ): Promise<AppRestaurantType> {
   const restaurantColRef = collection(db, "restaurants");
-  let imageUrl = 'https://placehold.co/600x400.png'; // Default placeholder
+  let imageUrl = 'https://placehold.co/600x400.png'; 
 
   if (imageFile) {
     const imageName = `${uuidv4()}-${imageFile.name}`;
@@ -141,7 +168,8 @@ export async function addRestaurantToFirestore(
   const cuisineNames = restaurantData.cuisine.map(cId => {
     const foundCuisine = allCuisinesStatic.find(c => c.id === cId);
     return foundCuisine ? foundCuisine.name : cId;
-  }).join(' y ');
+  }).join(', ');
+
 
   const description = `Un restaurante especializado en ${cuisineNames}${restaurantData.address ? `, ubicado cerca de ${restaurantData.address}` : ''}. Encuéntralo en el mapa.`;
 
@@ -161,7 +189,7 @@ export async function addRestaurantToFirestore(
 
   return {
     id: docRef.id,
-    ...restaurantData, // Spreads name, cuisine, address (if present), latitude, longitude
+    ...restaurantData, 
     imageUrl: docData.imageUrl,
     description: docData.description,
   };

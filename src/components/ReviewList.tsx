@@ -1,5 +1,7 @@
+
 "use client";
 
+import Image from "next/image";
 import type { Review } from "@/types";
 import StarRating from "./StarRating";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -66,9 +68,21 @@ export default function ReviewList({ reviews }: ReviewListProps) {
               size={16}
               className="mb-1"
             />
-            <p className="text-sm text-foreground leading-relaxed">
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
               {review.text}
             </p>
+            {review.imageUrl && (
+              <div className="mt-3 relative aspect-video max-h-64 w-full overflow-hidden rounded-md border">
+                <Image
+                  src={review.imageUrl}
+                  alt={`Imagen de la opinión de ${review.userName || 'usuario'}`}
+                  fill
+                  style={{ objectFit: "contain" }}
+                  className="rounded-md"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                />
+              </div>
+            )}
           </div>
         ))}
     </div>

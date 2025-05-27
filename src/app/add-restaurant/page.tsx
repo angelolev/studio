@@ -828,7 +828,7 @@ export default function AddRestaurantPage() {
             type="submit"
             form="add-restaurant-form" // Link to the form by its ID
             className="flex-1" // Use flex-1 for equal width on sm screens
-            variant="default" // Changed from outline to default for primary action
+            variant="outline" // Changed from outline to default for primary action
             disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
           >
             {mutation.isPending ? (

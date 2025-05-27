@@ -10,6 +10,7 @@ export interface Review {
   rating: number; // 1-5
   text: string;
   timestamp: number; // Milliseconds since Unix epoch for client-side usage
+  imageUrl?: string; // Optional image URL for the review
 }
 
 export interface Restaurant {

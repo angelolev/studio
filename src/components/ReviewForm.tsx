@@ -4,6 +4,8 @@
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import React, { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -14,6 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import StarRating from "./StarRating";
 import type { Review as AppReviewType } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,7 +27,16 @@ import {
 } from "@/lib/firestoreService";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Camera, UploadCloud, VideoOff } from "lucide-react";
+import { Input } from "@/components/ui/input"; // For hidden file input
+
+const MAX_FILE_SIZE_REVIEW = 2 * 1024 * 1024; // 2MB
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+];
 
 const reviewSchema = z.object({
   rating: z.number().min(1, "La calificación es requerida").max(5),
@@ -32,6 +44,17 @@ const reviewSchema = z.object({
     .string()
     .min(10, "La opinión debe tener al menos 10 caracteres")
     .max(500, "La opinión debe tener menos de 500 caracteres"),
+  image: z
+    .custom<File>()
+    .refine(
+      (file) => !file || file.size <= MAX_FILE_SIZE_REVIEW,
+      `El tamaño máximo del archivo es 2MB.`
+    )
+    .refine(
+      (file) => !file || ACCEPTED_IMAGE_TYPES.includes(file?.type || ""),
+      "Solo se aceptan formatos .jpg, .jpeg, .png y .webp."
+    )
+    .optional(),
 });
 
 type ReviewFormData = z.infer<typeof reviewSchema>;
@@ -49,18 +72,143 @@ export default function ReviewForm({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<
+    boolean | null
+  >(null);
+  const [currentStream, setCurrentStream] = useState<MediaStream | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const reviewFileUploadInputRef = useRef<HTMLInputElement | null>(null);
+
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewSchema),
     defaultValues: {
       rating: 0,
       text: "",
+      image: undefined,
     },
   });
 
+  const requestCameraAccess = async (): Promise<MediaStream | null> => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast({
+        variant: "destructive",
+        title: "Cámara no Soportada",
+        description: "Tu navegador no soporta acceso a la cámara.",
+      });
+      setHasCameraPermission(false);
+      setIsCameraOpen(false);
+      setIsTakingPhoto(false);
+      return null;
+    }
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      setHasCameraPermission(true);
+      return newStream;
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      setHasCameraPermission(false);
+      setIsCameraOpen(false);
+      setIsTakingPhoto(false);
+      toast({
+        variant: "destructive",
+        title: "Acceso a Cámara Denegado",
+        description:
+          "Por favor, habilita los permisos de cámara en tu navegador o la cámara seleccionada no está disponible.",
+      });
+      return null;
+    }
+  };
+
+  const openCamera = async () => {
+    setIsTakingPhoto(true);
+    setIsCameraOpen(true);
+    if (currentStream) {
+      currentStream.getTracks().forEach((track) => track.stop());
+      setCurrentStream(null);
+    }
+    const newStream = await requestCameraAccess();
+    if (newStream) {
+      setCurrentStream(newStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+        videoRef.current
+          .play()
+          .catch((err) => console.error("Error playing video for review:", err));
+      }
+    }
+  };
+
+  const closeCamera = () => {
+    if (currentStream) {
+      currentStream.getTracks().forEach((track) => track.stop());
+      setCurrentStream(null);
+    }
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current && currentStream) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext("2d");
+      if (context) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], `review-capture-${Date.now()}.jpg`, {
+              type: "image/jpeg",
+            });
+            form.setValue("image", file, { shouldValidate: true });
+            setImagePreview(URL.createObjectURL(file));
+          }
+        }, "image/jpeg");
+      }
+      closeCamera();
+      setIsTakingPhoto(false);
+    }
+  };
+
+  useEffect(() => {
+    const streamToClean = currentStream;
+    return () => {
+      if (streamToClean) {
+        streamToClean.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [currentStream]);
+
+  const handleImageFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      form.setValue("image", file, { shouldValidate: true });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      form.setValue("image", undefined, { shouldValidate: true });
+      setImagePreview(null);
+    }
+    setIsTakingPhoto(false);
+  };
+
   const addReviewMutation = useMutation({
-    mutationFn: (
-      reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId">
-    ) => addReviewToFirestore(restaurantId, reviewData),
+    mutationFn: (data: {
+      reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">;
+      imageFile?: File;
+    }) => addReviewToFirestore(restaurantId, data.reviewData, data.imageFile),
     onSuccess: (newPlainReview: AddedReviewPlain) => {
       toast({
         title: "¡Opinión Enviada!",
@@ -75,12 +223,18 @@ export default function ReviewForm({
         restaurantId: newPlainReview.restaurantId,
         rating: newPlainReview.rating,
         text: newPlainReview.text,
+        imageUrl: newPlainReview.imageUrl,
         timestamp: newPlainReview.timestamp,
       };
 
       onReviewAdded(newAppReview);
       form.reset();
-      form.setValue("rating", 0); // Explicitly reset rating in form to 0
+      form.setValue("rating", 0);
+      setImagePreview(null);
+      setIsTakingPhoto(false);
+      setIsCameraOpen(false);
+      if(reviewFileUploadInputRef.current) reviewFileUploadInputRef.current.value = "";
+
 
       queryClient.invalidateQueries({ queryKey: ["reviews", restaurantId] });
       queryClient.invalidateQueries({
@@ -105,16 +259,17 @@ export default function ReviewForm({
       });
       return;
     }
+    const { image, ...reviewCoreData } = data;
+    const imageFile = image instanceof File ? image : undefined;
 
-    const reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId"> =
-      {
-        userId: user.uid,
-        userName: user.displayName,
-        userPhotoUrl: user.photoURL,
-        rating: data.rating,
-        text: data.text,
-      };
-    addReviewMutation.mutate(reviewData);
+    const reviewPayload: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl"> = {
+      userId: user.uid,
+      userName: user.displayName,
+      userPhotoUrl: user.photoURL,
+      rating: reviewCoreData.rating,
+      text: reviewCoreData.text,
+    };
+    addReviewMutation.mutate({ reviewData: reviewPayload, imageFile });
   };
 
   if (loadingAuthState) {
@@ -149,7 +304,7 @@ export default function ReviewForm({
                   onRate={(rate) => {
                     field.onChange(rate);
                   }}
-                  size={30} // Increased star size
+                  size={24}
                 />
               </FormControl>
               <FormMessage />
@@ -174,10 +329,127 @@ export default function ReviewForm({
             </FormItem>
           )}
         />
+
+        {/* Image Upload/Capture Section */}
+        {isTakingPhoto && isCameraOpen ? (
+          <div className="space-y-4">
+            <div className="relative w-full aspect-video bg-muted rounded-md overflow-hidden border">
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                autoPlay
+                muted
+                playsInline
+              />
+              {hasCameraPermission === false && (
+                <Alert
+                  variant="destructive"
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4"
+                >
+                  <VideoOff className="mr-2 h-5 w-5" />
+                  <AlertTitle>Acceso a Cámara Denegado</AlertTitle>
+                  <AlertDescription>
+                    Revisa los permisos de cámara de tu navegador.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+            <canvas ref={canvasRef} className="hidden"></canvas>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={capturePhoto}
+                className="w-full"
+                disabled={hasCameraPermission !== true || !currentStream}
+                variant="outline"
+              >
+                <Camera className="mr-2 h-4 w-4" /> Capturar Foto
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  closeCamera();
+                  setIsTakingPhoto(false);
+                }}
+                className="w-full"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <FormField
+              control={form.control}
+              name="image"
+              render={({ field: imageField }) => (
+                <FormItem>
+                  <FormLabel>Agregar Foto (Opcional)</FormLabel>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      type="button"
+                      onClick={openCamera}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <Camera className="mr-2 h-4 w-4" /> Tomar Foto
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => reviewFileUploadInputRef.current?.click()}
+                    >
+                      <UploadCloud className="mr-2 h-4 w-4" /> Subir Imagen
+                    </Button>
+                    <FormControl>
+                      <Input
+                        type="file"
+                        className="sr-only"
+                        accept={ACCEPTED_IMAGE_TYPES.join(",")}
+                        ref={(instance) => {
+                           imageField.ref(instance); // For react-hook-form
+                           reviewFileUploadInputRef.current = instance; // For programmatic click
+                        }}
+                        onChange={(e) => {
+                          handleImageFileChange(e);
+                          // react-hook-form's onChange needs to be called with the file
+                           const files = e.target.files;
+                           imageField.onChange(files ? files[0] : undefined);
+                        }}
+                        onBlur={imageField.onBlur}
+                        name={imageField.name}
+                      />
+                    </FormControl>
+                  </div>
+                  <FormDescription>
+                    JPG, PNG, WebP, max 2MB.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {imagePreview && (
+              <div className="mt-4">
+                <FormLabel>Vista Previa</FormLabel>
+                <div className="mt-2 relative w-full aspect-video max-h-60 rounded-md overflow-hidden border">
+                  <Image
+                    src={imagePreview}
+                    alt="Vista previa de imagen para la opinión"
+                    fill
+                    style={{ objectFit: "contain" }}
+                  />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
         <Button
           type="submit"
           className="w-full sm:w-auto"
-          disabled={addReviewMutation.isPending}
+          disabled={addReviewMutation.isPending || (isTakingPhoto && isCameraOpen)}
           variant="outline"
         >
           {addReviewMutation.isPending ? (
