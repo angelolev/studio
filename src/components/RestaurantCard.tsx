@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -13,6 +14,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 import StarRating from "./StarRating";
 import ReviewForm from "./ReviewForm";
@@ -25,19 +27,15 @@ import {
   type ReviewWithNumericTimestamp,
 } from "@/lib/firestoreService";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, MapPin, Navigation } from "lucide-react";
-import { Separator } from "./ui/separator";
+import { Loader2, MapPin, Navigation, Maximize } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
-
+import { configureLeafletDefaultIcon } from "@/lib/leaflet-config";
 import type {
   LatLngExpression,
   Map as LeafletMapType,
   Icon as LeafletIconType,
-  IconOptions as LeafletIconOptionsType,
-} from "leaflet"; // Type imports are fine
-import { configureLeafletDefaultIcon } from "@/lib/leaflet-config"; // Import the configuration function
-
+} from "leaflet";
 import dynamic from "next/dynamic";
 
 const LeafletMapContainer = dynamic(
@@ -111,44 +109,13 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   });
 
   useEffect(() => {
-    if (isDialogOpen && !mapReadyDialog) {
+    if (isDialogOpen && !mapReadyDialog && !L) {
       import("leaflet")
         .then((leafletModule) => {
-          configureLeafletDefaultIcon(leafletModule); // Attempt to configure defaults
-
-          const currentDefaultOptions =
-            leafletModule.Icon.Default.prototype.options;
-
-          // Check if iconUrl was actually set by the config function
-          if (!currentDefaultOptions.iconUrl) {
-            console.error(
-              "RestaurantCard: FATAL - iconUrl is STILL missing from Leaflet's Icon.Default.prototype.options AFTER calling configureLeafletDefaultIcon with static paths. Check public/images/leaflet folder and leaflet-config.ts. Current prototype options:",
-              JSON.stringify(currentDefaultOptions)
-            );
-            // Fallback to a clearly broken state if config is still failing, to prevent crashes.
-            currentDefaultOptions.iconUrl =
-              "critical-error-icon-url-not-set.png";
-          }
-
-          // Explicitly build options from the (hopefully configured) prototype
-          const iconInstanceOptions: LeafletIconOptionsType = {
-            iconUrl: currentDefaultOptions.iconUrl!, // Assert non-null; previous check should catch if it's still missing
-            ...(currentDefaultOptions.iconRetinaUrl && {
-              iconRetinaUrl: currentDefaultOptions.iconRetinaUrl,
-            }),
-            ...(currentDefaultOptions.shadowUrl && {
-              shadowUrl: currentDefaultOptions.shadowUrl,
-            }),
-            iconSize: currentDefaultOptions.iconSize,
-            iconAnchor: currentDefaultOptions.iconAnchor,
-            popupAnchor: currentDefaultOptions.popupAnchor,
-            shadowSize: currentDefaultOptions.shadowSize,
-          };
-
-          const icon = new leafletModule.Icon.Default(iconInstanceOptions);
-
+          configureLeafletDefaultIcon(leafletModule);
+          const icon = new leafletModule.Icon.Default();
           setL(leafletModule);
-          setMarkerIconInstance(icon as LeafletIconType);
+          setMarkerIconInstance(icon);
           setMapReadyDialog(true);
         })
         .catch((error) => {
@@ -175,9 +142,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         }
       }
       mapRefDialog.current = null;
-      setMapReadyDialog(false); // Reset map readiness when dialog closes
+      setMapReadyDialog(false);
     }
-  }, [isDialogOpen, mapReadyDialog, toast]);
+  }, [isDialogOpen, mapReadyDialog, L, toast]);
 
   useEffect(() => {
     if (reviewsError) {
@@ -350,7 +317,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         LeafletPopup ? (
           <div className="my-4">
             <LeafletMapContainer
-              key={restaurant.id + "-dialog-map"}
+              key={
+                restaurant.id +
+                (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")
+              }
               center={restaurantLocation}
               zoom={17}
               scrollWheelZoom={false}
@@ -395,7 +365,6 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </p>
         ) : null}
 
-        {/* <Separator className="my-4" /> */}
         <div className="overflow-y-auto flex-grow pr-2 space-y-6">
           <ReviewSummary
             restaurantName={restaurant.name}
@@ -472,13 +441,13 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             )}
         </div>
         <DialogFooter className="mt-auto pt-4 border-t">
-          <Button
-            variant="outline"
-            onClick={() => setIsDialogOpen(false)}
-            style={{ backgroundColor: "#e74c3c" }}
-          >
-            Cerrar
-          </Button>
+          <DialogClose asChild>
+            <Button
+              variant="destructive"
+            >
+              Cerrar
+            </Button>
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

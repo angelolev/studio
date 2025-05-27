@@ -32,7 +32,7 @@ body {
     --accent-foreground: 190 60% 15%; /* Dark teal for text on accent */
 
     --destructive: 0 84.2% 60.2%; /* Default red - kept from previous */
-    --destructive-foreground: 0 0% 98%; /* Default light text on red */
+    --destructive-foreground: 0 0% 100%; /* Pure white */
 
     --border: 270 20% 85%; /* Light lavender-grey border */
     --input: 270 30% 96%; /* Very light lavender for input */
@@ -76,12 +76,13 @@ body {
     --muted: 220 15% 25%;
     --muted-foreground: 0 0% 63.9%;
 
-    /* Accent remains orange for contrast, can be adjusted if needed */
-    --accent: 42 100% 55%;
-    --accent-foreground: 42 100% 10%;
+    /* Accent remains teal for contrast in dark mode, was orange previously */
+    --accent: 190 60% 55%;
+    --accent-foreground: 190 60% 15%;
+
 
     --destructive: 0 70% 50%; /* Darker red for dark mode */
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 0 0% 100%; /* Pure white */
 
     --border: 220 15% 30%;
     --input: 220 15% 30%;
