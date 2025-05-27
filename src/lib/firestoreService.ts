@@ -13,7 +13,7 @@ import {
   getCountFromServer,
   getDocs,
   serverTimestamp,
-  limit, // Import limit
+  limit, 
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Firebase Storage imports
 import { v4 as uuidv4 } from 'uuid';
@@ -57,17 +57,29 @@ export interface AddedReviewPlain {
 
 export async function addReviewToFirestore(
   restaurantId: string,
-  reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">, // imageUrl will be handled internally
+  reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">, 
   imageFile?: File
 ): Promise<AddedReviewPlain> {
   if (!reviewData.userId) {
     throw new Error("Se requiere ID de usuario para agregar una opinión.");
   }
 
+  // Server-side check to prevent duplicate reviews
+  const reviewsColRefForCheck = collection(db, "restaurants", restaurantId, "reviews");
+  const duplicateCheckQuery = query(
+    reviewsColRefForCheck, 
+    where("userId", "==", reviewData.userId),
+    limit(1) 
+  );
+  const duplicateCheckSnapshot = await getDocs(duplicateCheckQuery);
+
+  if (!duplicateCheckSnapshot.empty) {
+    throw new Error("Ya has enviado una opinión para este restaurante.");
+  }
+
   let reviewImageUrl: string | undefined = undefined;
   if (imageFile) {
     const imageName = `${uuidv4()}-${imageFile.name}`;
-    // Path: review-images/{restaurantId}/{userId}/{imageName}
     const imageStorageRef = ref(storage, `review-images/${restaurantId}/${reviewData.userId}/${imageName}`);
     try {
       const snapshot = await uploadBytes(imageStorageRef, imageFile);
@@ -83,10 +95,10 @@ export async function addReviewToFirestore(
     ...reviewData,
     restaurantId,
     timestamp: serverTimestamp(),
-    ...(reviewImageUrl && { imageUrl: reviewImageUrl }), // Add imageUrl only if it exists
+    ...(reviewImageUrl && { imageUrl: reviewImageUrl }), 
   };
   const docRef = await addDoc(reviewsColRef, docData);
-  const clientTimestampMillis = Date.now();
+  const clientTimestampMillis = Date.now(); 
   return {
     id: docRef.id,
     userId: reviewData.userId,
@@ -95,7 +107,7 @@ export async function addReviewToFirestore(
     rating: reviewData.rating,
     text: reviewData.text,
     restaurantId,
-    timestamp: clientTimestampMillis,
+    timestamp: clientTimestampMillis, 
     ...(reviewImageUrl && { imageUrl: reviewImageUrl }),
   };
 }
@@ -107,7 +119,7 @@ export async function getReviewsFromFirestore(
   const q = query(reviewsColRef, orderBy("timestamp", "desc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
-    const data = doc.data() as ReviewFirestoreData; // Use ReviewFirestoreData
+    const data = doc.data() as ReviewFirestoreData; 
     const timestamp = data.timestamp as Timestamp | null;
     return {
       id: doc.id,
@@ -129,7 +141,7 @@ export async function checkIfUserReviewed(
 ): Promise<boolean> {
   if (!userId) return false;
   const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
-  const q = query(reviewsColRef, where("userId", "==", userId));
+  const q = query(reviewsColRef, where("userId", "==", userId), limit(1)); // Added limit(1)
   const snapshot = await getCountFromServer(q);
   return snapshot.data().count > 0;
 }
@@ -138,7 +150,7 @@ export async function checkIfUserReviewed(
 
 export interface RestaurantFirestoreData {
   name: string;
-  cuisine: string[];
+  cuisine: string[]; 
   address?: string; 
   latitude: number;
   longitude: number;
@@ -165,14 +177,14 @@ export async function addRestaurantToFirestore(
       throw new Error("Error al subir la imagen. Por favor, intenta de nuevo.");
     }
   }
-
+  
   const cuisineNames = restaurantData.cuisine.map(cId => {
     const foundCuisine = allCuisinesStatic.find(c => c.id === cId);
     return foundCuisine ? foundCuisine.name : cId;
   }).join(', ');
 
 
-  const description = `Un restaurante especializado en ${cuisineNames}${restaurantData.address ? `, ubicado cerca de ${restaurantData.address}` : ''}. Encuéntralo en el mapa.`;
+  const description = `Un restaurante especializado en ${cuisineNames}${restaurantData.address ? `, ubicado en ${restaurantData.address}` : ''}. Encuéntralo en el mapa.`;
 
 
   const docData: RestaurantFirestoreData = {
@@ -219,9 +231,6 @@ export async function getRestaurantsFromFirestore(): Promise<AppRestaurantType[]
 
 export async function checkRestaurantExistsByName(name: string): Promise<boolean> {
   const restaurantColRef = collection(db, "restaurants");
-  // Firestore queries are case-sensitive for '=='
-  // For a true case-insensitive check, you'd typically store a normalized (e.g., lowercase)
-  // version of the name and query against that. This is an exact match check.
   const q = query(restaurantColRef, where("name", "==", name), limit(1));
   const querySnapshot = await getDocs(q);
   return !querySnapshot.empty;
