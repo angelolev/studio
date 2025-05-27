@@ -20,7 +20,7 @@ const SummarizeReviewsInputSchema = z.object({
 export type SummarizeReviewsInput = z.infer<typeof SummarizeReviewsInputSchema>;
 
 const SummarizeReviewsOutputSchema = z.object({
-  summary: z.string().describe('Un sentimiento resumido y conversacional de las opiniones anteriores, en español, como si se lo contaras a un amigo.'),
+  summary: z.string().describe('Una frase corta y directa que resuma el sentimiento general de las opiniones sobre el restaurante, en español.'),
 });
 export type SummarizeReviewsOutput = z.infer<typeof SummarizeReviewsOutputSchema>;
 
@@ -32,9 +32,7 @@ const summarizeReviewsPrompt = ai.definePrompt({
   name: 'summarizeReviewsPrompt',
   input: {schema: SummarizeReviewsInputSchema},
   output: {schema: SummarizeReviewsOutputSchema},
-  prompt: `¡Hola! Imagina que le estás contando a un amigo sobre el restaurante "{{restaurantName}}". Queremos saber qué onda con este lugar, basándonos en lo que otros han dicho.
-
-Tu tarea es leer estas opiniones y luego dar un resumen súper amigable y en español, como si estuvieras chismorreando con tu mejor amigo sobre dónde ir a comer. Destaca lo bueno, lo malo y lo que más se repite, ¡pero con buena onda!
+  prompt: `Para el restaurante "{{restaurantName}}", analiza las siguientes opiniones de clientes. Tu tarea es generar una **única frase corta y directa** en español que capture la esencia de lo que la gente dice. Debe ser muy concisa.
 
 **Importante:** Si alguna opinión tiene palabras raras, inventadas, que claramente no son del español y no se entienden en el contexto, o si la opinión entera parece no tener sentido o ser spam, por favor ignora esas partes o incluso la opinión completa. Queremos un resumen útil y claro, basado en comentarios entendibles y genuinos en español.
 
@@ -43,7 +41,7 @@ Opiniones:
 - {{{this}}}
 {{/each}}
 
-Entonces, ¿qué tal está "{{restaurantName}}"? Cuéntame en español, como para un amigo:`,
+En una frase corta y directa en español, ¿qué dice la gente sobre "{{restaurantName}}"?`,
 });
 
 const summarizeReviewsFlow = ai.defineFlow(
@@ -57,3 +55,4 @@ const summarizeReviewsFlow = ai.defineFlow(
     return output!;
   }
 );
+
