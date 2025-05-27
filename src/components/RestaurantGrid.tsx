@@ -9,9 +9,9 @@ import { getRestaurantsFromFirestore } from '@/lib/firestoreService';
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useState, useMemo } from 'react';
-import { cuisines as allCuisines } from '@/data/cuisines'; // Import cuisines
-import { Button } from '@/components/ui/button'; // Import Button for badges
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"; // For horizontal scroll
+import { cuisines as allCuisines } from '@/data/cuisines';
+import { Button } from '@/components/ui/button';
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export default function RestaurantGrid() {
   const { data: restaurants, isLoading, error, isError } = useQuery<Restaurant[], Error>({
@@ -72,7 +72,7 @@ export default function RestaurantGrid() {
         <ScrollArea className="w-full whitespace-nowrap rounded-md">
           <div className="flex space-x-2 pb-2">
             <Button
-              variant={selectedCuisineId === null ? "default" : "outline"}
+              variant={selectedCuisineId === null ? "default" : "secondary"}
               size="sm"
               className="rounded-full px-4 py-1 h-auto text-sm transition-colors duration-150 ease-in-out"
               onClick={() => setSelectedCuisineId(null)}
@@ -82,7 +82,7 @@ export default function RestaurantGrid() {
             {allCuisines.map((cuisine) => (
               <Button
                 key={cuisine.id}
-                variant={selectedCuisineId === cuisine.id ? "default" : "outline"}
+                variant={selectedCuisineId === cuisine.id ? "default" : "secondary"}
                 size="sm"
                 className="rounded-full px-4 py-1 h-auto text-sm transition-colors duration-150 ease-in-out"
                 onClick={() => setSelectedCuisineId(cuisine.id)}
@@ -113,12 +113,12 @@ export default function RestaurantGrid() {
               No hay restaurantes que coincidan con "{searchTerm}".
             </p>
           )}
-          {!searchTerm && !selectedCuisineId && restaurants.length > 0 && (
+          {!searchTerm && !selectedCuisineId && restaurants && restaurants.length > 0 && (
              <p className="text-muted-foreground">
               Ajusta tus filtros para encontrar restaurantes.
             </p>
           )}
-           {!searchTerm && !selectedCuisineId && restaurants.length === 0 && (
+           {!searchTerm && !selectedCuisineId && restaurants && restaurants.length === 0 && (
              <p className="text-muted-foreground">
                Parece que aún no hay restaurantes listados. ¿Por qué no agregas el primero?
             </p>
