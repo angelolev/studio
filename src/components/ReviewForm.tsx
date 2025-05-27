@@ -15,6 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription, // Added missing import
 } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import StarRating from "./StarRating";
@@ -83,6 +84,8 @@ export default function ReviewForm({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reviewFileUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const reviewTextareaRef = useRef<HTMLTextAreaElement>(null);
+
 
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewSchema),
@@ -229,7 +232,7 @@ export default function ReviewForm({
 
       onReviewAdded(newAppReview);
       form.reset();
-      form.setValue("rating", 0);
+      form.setValue("rating", 0); // Explicitly reset rating after form.reset
       setImagePreview(null);
       setIsTakingPhoto(false);
       setIsCameraOpen(false);
@@ -272,6 +275,7 @@ export default function ReviewForm({
     addReviewMutation.mutate({ reviewData: reviewPayload, imageFile });
   };
 
+
   if (loadingAuthState) {
     return (
       <div className="flex items-center justify-center p-4 my-4 min-h-[100px]">
@@ -304,7 +308,7 @@ export default function ReviewForm({
                   onRate={(rate) => {
                     field.onChange(rate);
                   }}
-                  size={24}
+                  size={24} 
                 />
               </FormControl>
               <FormMessage />
@@ -319,6 +323,7 @@ export default function ReviewForm({
               <FormLabel>Tu Opinión</FormLabel>
               <FormControl>
                 <Textarea
+                  ref={reviewTextareaRef}
                   placeholder="Cuéntanos sobre tu experiencia..."
                   {...field}
                   rows={4}
@@ -409,12 +414,11 @@ export default function ReviewForm({
                         className="sr-only"
                         accept={ACCEPTED_IMAGE_TYPES.join(",")}
                         ref={(instance) => {
-                           imageField.ref(instance); // For react-hook-form
-                           reviewFileUploadInputRef.current = instance; // For programmatic click
+                           imageField.ref(instance); 
+                           reviewFileUploadInputRef.current = instance; 
                         }}
                         onChange={(e) => {
                           handleImageFileChange(e);
-                          // react-hook-form's onChange needs to be called with the file
                            const files = e.target.files;
                            imageField.onChange(files ? files[0] : undefined);
                         }}
