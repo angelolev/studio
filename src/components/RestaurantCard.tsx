@@ -425,14 +425,14 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           {loadingAuthState && (
             <div className="flex items-center justify-center p-4 my-4 min-h-[50px]">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <p className="ml-2 text-muted-foreground text-sm">
+              <p className="ml-2 text-muted-foreground text-sm dark:text-white">
                 Verificando estado de autenticación...
               </p>
             </div>
           )}
 
           {!loadingAuthState && !user && (
-            <p className="text-left italic text-sm p-2 text-accent-foreground">
+            <p className="text-left italic text-sm p-2 text-accent-foreground dark:text-white">
               Inicia sesión para dejar tu opinión.
             </p>
           )}
@@ -440,7 +440,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           {!loadingAuthState && user && isLoadingUserReviewedCheck && (
             <div className="flex items-center justify-center p-4 my-4 min-h-[50px]">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <p className="ml-2 text-muted-foreground text-sm">
+              <p className="ml-2 text-muted-foreground text-sm dark:text-white">
                 Comprobando si ya opinaste...
               </p>
             </div>
@@ -451,7 +451,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             !isLoadingUserReviewedCheck &&
             showReviewForm && (
               <div className="px-1">
-                <h3 className="text-lg font-semibold mb-3 text-foreground">
+                <h3 className="text-lg font-semibold mb-3 text-foreground dark:text-white">
                   Deja tu Opinión
                 </h3>
                 <ReviewForm
@@ -465,7 +465,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
             !isLoadingUserReviewedCheck &&
             !showReviewForm &&
             userHasAlreadyReviewed && (
-              <p className="text-left italic text-sm p-2 text-accent-foreground">
+              <p className="text-left italic text-sm p-2 text-accent-foreground dark:text-white">
                 Ya has dejado tu opinión en este restaurante. ¡Gracias por tu
                 ayuda!
               </p>
