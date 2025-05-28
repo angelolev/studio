@@ -15,7 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription as UIFormDescription, // Renamed to avoid conflict
+  FormDescription as UIFormDescription,
 } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import StarRating from "./StarRating";
@@ -29,9 +29,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, UploadCloud, VideoOff, XCircle } from "lucide-react";
-import { Input } from "@/components/ui/input"; // For hidden file input
+import { Input } from "@/components/ui/input";
 
-const MAX_FILE_SIZE_REVIEW = 5 * 1024 * 1024;
+const MAX_FILE_SIZE_REVIEW = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -187,29 +187,11 @@ export default function ReviewForm({
     };
   }, [currentStream]);
 
-  const handleImageFileChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      form.setValue("image", file, { shouldValidate: true });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      form.setValue("image", undefined, { shouldValidate: true });
-      setImagePreview(null);
-    }
-    setIsTakingPhoto(false);
-  };
-
   const removeImage = () => {
     setImagePreview(null);
     form.setValue("image", undefined, { shouldValidate: true });
     if (reviewFileUploadInputRef.current) {
-      reviewFileUploadInputRef.current.value = ""; // Clear the file input
+      reviewFileUploadInputRef.current.value = "";
     }
   };
 
@@ -238,12 +220,11 @@ export default function ReviewForm({
 
       onReviewAdded(newAppReview);
       form.reset();
-      form.setValue("rating", 0); 
+      form.setValue("rating", 0);
       setImagePreview(null);
       setIsTakingPhoto(false);
       setIsCameraOpen(false);
       if(reviewFileUploadInputRef.current) reviewFileUploadInputRef.current.value = "";
-
 
       queryClient.invalidateQueries({ queryKey: ["reviews", restaurantId] });
       queryClient.invalidateQueries({
@@ -422,9 +403,19 @@ export default function ReviewForm({
                            reviewFileUploadInputRef.current = instance; 
                         }}
                         onChange={(e) => {
-                          handleImageFileChange(e);
-                           const files = e.target.files;
-                           imageField.onChange(files ? files[0] : undefined);
+                          const file = e.target.files?.[0];
+                          imageField.onChange(file || undefined); // Update RHF state
+                          
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setImagePreview(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          } else {
+                            setImagePreview(null);
+                          }
+                          setIsTakingPhoto(false); // Reset camera state if a file is uploaded
                         }}
                         onBlur={imageField.onBlur}
                         name={imageField.name}
@@ -483,3 +474,5 @@ export default function ReviewForm({
     </Form>
   );
 }
+
+
