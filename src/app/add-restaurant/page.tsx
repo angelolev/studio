@@ -17,6 +17,9 @@ import type {
 } from "leaflet";
 import dynamic from "next/dynamic";
 
+// Import the configuration function, not L directly
+import { configureLeafletDefaultIcon } from "@/lib/leaflet-config"; 
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,7 +32,7 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
+  FormDescription as UIFormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -55,7 +58,6 @@ import { useToast } from "@/hooks/use-toast";
 import type { Restaurant } from "@/types";
 import { addRestaurantToFirestore, checkRestaurantExistsByName } from "@/lib/firestoreService";
 import { cuisines as allCuisines } from "@/data/cuisines";
-import { configureLeafletDefaultIcon } from "@/lib/leaflet-config";
 import {
   Loader2,
   Camera,
@@ -65,7 +67,6 @@ import {
   LocateFixed,
 } from "lucide-react";
 
-// Dynamic imports for Leaflet components
 const LeafletMapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   {
@@ -94,8 +95,8 @@ const DynamicLeafletPopup = dynamic(
 interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
-  icon: LeafletIconType | null;
-  L: typeof import("leaflet") | null;
+  L: typeof import('leaflet') | null; // Pass L
+  // icon prop removed as we rely on global default
   MarkerComponent: typeof DynamicLeafletMarker | null;
   PopupComponent: typeof DynamicLeafletPopup | null;
 }
@@ -103,27 +104,27 @@ interface LocationMarkerProps {
 function LocationMarker({
   position,
   onMapClick,
-  icon,
   L,
   MarkerComponent,
   PopupComponent,
 }: LocationMarkerProps) {
-  const { useMapEvents } = require("react-leaflet");
+  const { useMapEvents } = require("react-leaflet"); // Keep require here as it's client-side only
 
   useMapEvents({
     click(e) {
-      if (L) {
+      if (L) { 
         onMapClick(L.latLng(e.latlng.lat, e.latlng.lng));
       }
     },
   });
 
-  if (!position || !icon || !MarkerComponent || !PopupComponent) {
+  if (!position || !L || !MarkerComponent || !PopupComponent) {
     return null;
   }
 
+  // No icon prop passed, it will use L.Icon.Default (globally configured)
   return (
-    <MarkerComponent position={position} icon={icon}>
+    <MarkerComponent position={position}>
       <PopupComponent>Has seleccionado esta ubicación</PopupComponent>
     </MarkerComponent>
   );
@@ -178,10 +179,11 @@ export default function AddRestaurantPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [LModule, setLModule] = useState<typeof import("leaflet") | null>(null);
-  const [mapMarkerIcon, setMapMarkerIcon] = useState<LeafletIconType | null>(null);
+  const [L, setL] = useState<typeof import('leaflet') | null>(null);
   const [mapReady, setMapReady] = useState(false);
+
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
   const [currentMapCenter, setCurrentMapCenter] = useState<LatLngExpression>(
     DEFAULT_MAP_CENTER_LIMA
   );
@@ -212,40 +214,31 @@ export default function AddRestaurantPage() {
       image: undefined,
     },
   });
-
+  
   useEffect(() => {
-    if (!mapReady) {
-      import("leaflet")
-        .then((leafletModule) => {
-          configureLeafletDefaultIcon(leafletModule);
-          const icon = new leafletModule.Icon.Default();
-          setLModule(leafletModule);
-          setMapMarkerIcon(icon);
-          setMapReady(true);
-        })
-        .catch((error) => {
-          console.error("Failed to load Leaflet module", error);
-          toast({
-            title: "Error de Mapa",
-            description: "No se pudo cargar el módulo del mapa.",
-            variant: "destructive",
-          });
-        });
+    if (typeof window !== 'undefined' && !mapReady) {
+      import('leaflet').then(leafletModule => {
+        configureLeafletDefaultIcon(leafletModule);
+        setL(leafletModule);
+        setMapReady(true); // Leaflet core and icon config are ready
+      }).catch(error => {
+        console.error("Failed to load Leaflet module", error);
+        toast({ title: "Error del Mapa", description: "No se pudo cargar la librería del mapa.", variant: "destructive" });
+      });
     }
-  }, [mapReady, toast]);
-
+  }, [mapReady, toast]); // mapReady ensures this runs once after initial client render
 
   useEffect(() => {
     if (
-      mapReady &&
-      LModule &&
+      mapReady && 
+      L && 
       navigator.geolocation &&
       !form.getValues("latitude") && 
       !form.getValues("longitude")
     ) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const userLatLng = LModule.latLng(
+          const userLatLng = L.latLng( 
             position.coords.latitude,
             position.coords.longitude
           );
@@ -263,7 +256,7 @@ export default function AddRestaurantPage() {
         { timeout: 10000 }
       );
     }
-  }, [mapReady, LModule, form]);
+  }, [mapReady, L, form]);
 
 
   useEffect(() => {
@@ -461,7 +454,7 @@ export default function AddRestaurantPage() {
   };
 
   const centerMapOnUser = () => {
-     if (!mapReady || !LModule) {
+     if (!mapReady || !L) { 
       toast({
         title: "Mapa no listo",
         description: "Por favor, espera a que el mapa cargue.",
@@ -472,7 +465,7 @@ export default function AddRestaurantPage() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const userLatLng = LModule.latLng(
+          const userLatLng = L.latLng( 
             position.coords.latitude,
             position.coords.longitude
           );
@@ -541,6 +534,9 @@ export default function AddRestaurantPage() {
   const displayCenter = selectedMapPosition
     ? ([selectedMapPosition.lat, selectedMapPosition.lng] as LatLngExpression)
     : currentMapCenter;
+    
+  const canRenderMap = mapReady && L && LeafletMapContainer && LeafletTileLayer && DynamicLeafletMarker && DynamicLeafletPopup;
+
 
   return (
     <div className="max-w-2xl mx-auto pb-28 relative">
@@ -584,9 +580,9 @@ export default function AddRestaurantPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cocina / Categorías</FormLabel>
-                    <FormDescription>
+                    <UIFormDescription>
                       Selecciona una o más categorías para el restaurante.
-                    </FormDescription>
+                    </UIFormDescription>
                     <FormControl>
                       <div className="flex flex-wrap gap-2 pt-2">
                         {allCuisines.map((cuisineItem) => {
@@ -597,14 +593,9 @@ export default function AddRestaurantPage() {
                             <Button
                               key={cuisineItem.id}
                               type="button"
-                              variant={isSelected ? "default" : "outline"}
+                              variant={isSelected ? "default" : "secondary"}
                               size="sm"
-                              className={`rounded-full px-3 py-1 h-auto text-sm transition-colors duration-150 ease-in-out
-                                          ${
-                                            isSelected
-                                              ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                                              : "bg-background text-foreground border-border hover:bg-accent hover:text-accent-foreground"
-                                          }`}
+                              className={`rounded-full px-3 py-1 h-auto text-sm transition-colors duration-150 ease-in-out`}
                               onClick={() => {
                                 const currentValue = field.value || [];
                                 if (isSelected) {
@@ -634,7 +625,7 @@ export default function AddRestaurantPage() {
 
               <FormField
                 control={form.control}
-                name="latitude"
+                name="latitude" 
                 render={({ fieldState: latitudeFieldState }) => (
                   <FormItem>
                     <div className="flex justify-between items-center mb-1">
@@ -645,17 +636,17 @@ export default function AddRestaurantPage() {
                         size="sm"
                         onClick={centerMapOnUser}
                         className="gap-1.5"
-                        disabled={!mapReady || !LModule}
+                        disabled={!mapReady || !L}
                       >
                         <LocateFixed size={16} />
                         Usar mi ubicación
                       </Button>
                     </div>
-                    <FormDescription>
+                    <UIFormDescription>
                       Haz clic en el mapa para seleccionar la ubicación del
                       restaurante.
-                    </FormDescription>
-                     {mapReady && LModule && mapMarkerIcon && LeafletMapContainer && LeafletTileLayer && DynamicLeafletMarker && DynamicLeafletPopup ? (
+                    </UIFormDescription>
+                     {canRenderMap ? (
                       <LeafletMapContainer
                         center={displayCenter}
                         zoom={DEFAULT_MAP_ZOOM}
@@ -675,8 +666,7 @@ export default function AddRestaurantPage() {
                         <LocationMarker
                           position={selectedMapPosition}
                           onMapClick={handleMapClick}
-                          icon={mapMarkerIcon}
-                          L={LModule}
+                          L={L}
                           MarkerComponent={DynamicLeafletMarker}
                           PopupComponent={DynamicLeafletPopup}
                         />
@@ -713,9 +703,9 @@ export default function AddRestaurantPage() {
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription>
+                    <UIFormDescription>
                       Puedes agregar una dirección textual como referencia.
-                    </FormDescription>
+                    </UIFormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -731,17 +721,14 @@ export default function AddRestaurantPage() {
                       muted
                       playsInline
                     />
-                    {hasCameraPermission === false && (
-                      <UIAlert
-                        variant="destructive"
-                        className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4"
-                      >
-                        <VideoOff className="mr-2 h-5 w-5" />
-                        <UIAlertTitle>Acceso a Cámara Denegado</UIAlertTitle>
-                        <UIAlertDescription>
-                          Revisa los permisos de cámara de tu navegador.
-                        </UIAlertDescription>
-                      </UIAlert>
+                     { !(hasCameraPermission) && (
+                        <UIAlert variant="destructive" className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
+                            <VideoOff className="mr-2 h-5 w-5" />
+                            <UIAlertTitle>Acceso a Cámara Denegado</UIAlertTitle>
+                            <UIAlertDescription>
+                                Revisa los permisos de cámara de tu navegador.
+                            </UIAlertDescription>
+                        </UIAlert>
                     )}
                   </div>
                   <canvas ref={canvasRef} className="hidden"></canvas>
@@ -816,9 +803,9 @@ export default function AddRestaurantPage() {
                             />
                           </FormControl>
                         </div>
-                        <FormDescription>
+                        <UIFormDescription>
                           Toma una foto o sube una imagen (JPG, PNG, WebP, max 5MB).
-                        </FormDescription>
+                        </UIFormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -906,4 +893,3 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
-
