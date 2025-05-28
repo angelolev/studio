@@ -1,8 +1,8 @@
 
 "use server";
 
-import { db, storage } from "@/lib/firebase"; // Import storage
-import type { Review as AppReviewType, Restaurant as AppRestaurantType, Cuisine as AppCuisineType } from "@/types";
+import { db, storage } from "@/lib/firebase";
+import type { Review as AppReviewType, Restaurant as AppRestaurantType } from "@/types";
 import {
   collection,
   addDoc,
@@ -15,9 +15,9 @@ import {
   serverTimestamp,
   limit, 
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Firebase Storage imports
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from 'uuid';
-import { cuisines as allCuisinesStatic } from '@/data/cuisines'; // For description generation
+import { cuisines as allCuisinesStatic } from '@/data/cuisines';
 
 // --- Review Types and Functions ---
 export interface ReviewFirestoreData {
@@ -57,18 +57,25 @@ export interface AddedReviewPlain {
 
 export async function addReviewToFirestore(
   restaurantId: string,
-  reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">, 
-  imageFile?: File
+  reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">,
+  // imageFile parameter is removed. imageUrl is now part of reviewData if provided.
+  // This function now expects imageUrl to be passed in reviewData if an image was uploaded by the client.
+  // However, to keep the type Omit clean, we'll add it to docData directly.
+  // So, the signature for the data coming from the client to the mutation will include imageUrl.
+  // The actual server action will receive it as part of the payload.
+  // Let's adjust reviewData type for the server action.
+  // We'll expect `imageUrl` to be part of the first-class properties of the data payload for the review.
+  // Let's redefine what addReviewToFirestore expects for reviewData from the client-side mutation.
+  payload: Omit<ReviewFirestoreData, "timestamp" | "restaurantId"> & { imageUrl?: string }
 ): Promise<AddedReviewPlain> {
-  if (!reviewData.userId) {
+  if (!payload.userId) {
     throw new Error("Se requiere ID de usuario para agregar una opinión.");
   }
 
-  // Server-side check to prevent duplicate reviews
   const reviewsColRefForCheck = collection(db, "restaurants", restaurantId, "reviews");
   const duplicateCheckQuery = query(
     reviewsColRefForCheck, 
-    where("userId", "==", reviewData.userId),
+    where("userId", "==", payload.userId),
     limit(1) 
   );
   const duplicateCheckSnapshot = await getDocs(duplicateCheckQuery);
@@ -77,38 +84,34 @@ export async function addReviewToFirestore(
     throw new Error("Ya has enviado una opinión para este restaurante.");
   }
 
-  let reviewImageUrl: string | undefined = undefined;
-  if (imageFile) {
-    const imageName = `${uuidv4()}-${imageFile.name}`;
-    const imageStorageRef = ref(storage, `review-images/${restaurantId}/${reviewData.userId}/${imageName}`);
-    try {
-      const snapshot = await uploadBytes(imageStorageRef, imageFile);
-      reviewImageUrl = await getDownloadURL(snapshot.ref);
-    } catch (error) {
-      console.error("Error uploading review image to Firebase Storage: ", error);
-      // Not throwing error here, review can still be submitted without image
-    }
-  }
+  // Firebase Storage upload logic is removed from here.
+  // The imageUrl, if any, is expected to be in the payload.
 
   const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
   const docData: ReviewFirestoreData = {
-    ...reviewData,
-    restaurantId,
+    userId: payload.userId,
+    userName: payload.userName,
+    userPhotoUrl: payload.userPhotoUrl,
+    rating: payload.rating,
+    text: payload.text,
+    restaurantId, // Added back here
     timestamp: serverTimestamp(),
-    ...(reviewImageUrl && { imageUrl: reviewImageUrl }), 
+    ...(payload.imageUrl && { imageUrl: payload.imageUrl }), 
   };
+
   const docRef = await addDoc(reviewsColRef, docData);
   const clientTimestampMillis = Date.now(); 
+
   return {
     id: docRef.id,
-    userId: reviewData.userId,
-    userName: reviewData.userName,
-    userPhotoUrl: reviewData.userPhotoUrl,
-    rating: reviewData.rating,
-    text: reviewData.text,
+    userId: payload.userId,
+    userName: payload.userName,
+    userPhotoUrl: payload.userPhotoUrl,
+    rating: payload.rating,
+    text: payload.text,
     restaurantId,
     timestamp: clientTimestampMillis, 
-    ...(reviewImageUrl && { imageUrl: reviewImageUrl }),
+    ...(payload.imageUrl && { imageUrl: payload.imageUrl }),
   };
 }
 
@@ -141,7 +144,7 @@ export async function checkIfUserReviewed(
 ): Promise<boolean> {
   if (!userId) return false;
   const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
-  const q = query(reviewsColRef, where("userId", "==", userId), limit(1)); // Added limit(1)
+  const q = query(reviewsColRef, where("userId", "==", userId), limit(1));
   const snapshot = await getCountFromServer(q);
   return snapshot.data().count > 0;
 }

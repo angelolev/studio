@@ -24,12 +24,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   addReviewToFirestore,
   type AddedReviewPlain,
-  type ReviewFirestoreData,
+  type ReviewFirestoreData, // Keep this for the Omit type if needed
 } from "@/lib/firestoreService";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, UploadCloud, VideoOff, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { storage } from "@/lib/firebase"; // Import Firebase storage instance
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { v4 as uuidv4 } from "uuid";
 
 const MAX_FILE_SIZE_REVIEW = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_IMAGE_TYPES = [
@@ -65,6 +68,10 @@ interface ReviewFormProps {
   onReviewAdded: (newReview: AppReviewType) => void;
 }
 
+// Type for the data passed to the mutationFn
+type AddReviewMutationPayload = Omit<ReviewFirestoreData, "timestamp" | "restaurantId"> & { imageUrl?: string };
+
+
 export default function ReviewForm({
   restaurantId,
   onReviewAdded,
@@ -84,6 +91,8 @@ export default function ReviewForm({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reviewFileUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
 
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewSchema),
@@ -196,10 +205,8 @@ export default function ReviewForm({
   };
 
   const addReviewMutation = useMutation({
-    mutationFn: (data: {
-      reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">;
-      imageFile?: File;
-    }) => addReviewToFirestore(restaurantId, data.reviewData, data.imageFile),
+    mutationFn: (payload: AddReviewMutationPayload) => 
+      addReviewToFirestore(restaurantId, payload),
     onSuccess: (newPlainReview: AddedReviewPlain) => {
       toast({
         title: "¡Opinión Enviada!",
@@ -240,7 +247,7 @@ export default function ReviewForm({
     },
   });
 
-  const onSubmit: SubmitHandler<ReviewFormData> = (data) => {
+  const onSubmit: SubmitHandler<ReviewFormData> = async (data) => {
     if (!user) {
       toast({
         title: "Autenticación Requerida",
@@ -249,17 +256,45 @@ export default function ReviewForm({
       });
       return;
     }
+
+    addReviewMutation.setPending(); // Manually set pending state if needed for UI
+
     const { image, ...reviewCoreData } = data;
     const imageFile = image instanceof File ? image : undefined;
+    let reviewImageUrl: string | undefined = undefined;
 
-    const reviewPayload: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl"> = {
+    if (imageFile) {
+      try {
+        const imageName = `${uuidv4()}-${imageFile.name}`;
+        const imageStoragePath = `review-images/${restaurantId}/${user.uid}/${imageName}`;
+        const imageStorageRefInstance = storageRef(storage, imageStoragePath);
+        
+        toast({ title: "Subiendo imagen...", description: "Por favor espera."});
+        const snapshot = await uploadBytes(imageStorageRefInstance, imageFile);
+        reviewImageUrl = await getDownloadURL(snapshot.ref);
+        toast({ title: "Imagen subida", description: "Tu imagen se ha subido con éxito."});
+      } catch (error) {
+        console.error("Error uploading review image to Firebase Storage: ", error);
+        toast({
+          title: "Error al Subir Imagen",
+          description: "No se pudo subir la imagen. La opinión se enviará sin ella.",
+          variant: "destructive",
+        });
+        // Optionally, allow submission without image or return early
+        // For now, we'll proceed to submit the review without the image if upload fails
+      }
+    }
+
+    const reviewPayload: AddReviewMutationPayload = {
       userId: user.uid,
       userName: user.displayName,
       userPhotoUrl: user.photoURL,
       rating: reviewCoreData.rating,
       text: reviewCoreData.text,
+      ...(reviewImageUrl && { imageUrl: reviewImageUrl }),
     };
-    addReviewMutation.mutate({ reviewData: reviewPayload, imageFile });
+    
+    addReviewMutation.mutate(reviewPayload);
   };
 
 
@@ -312,6 +347,10 @@ export default function ReviewForm({
                 <Textarea
                   placeholder="Cuéntanos sobre tu experiencia..."
                   {...field}
+                  ref={(e) => {
+                    field.ref(e);
+                    textareaRef.current = e;
+                  }}
                   rows={4}
                   className="bg-card focus-visible:border-primary"
                 />
@@ -404,7 +443,7 @@ export default function ReviewForm({
                         }}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          imageField.onChange(file || undefined); // Update RHF state
+                          imageField.onChange(file || undefined); 
                           
                           if (file) {
                             const reader = new FileReader();
@@ -415,7 +454,7 @@ export default function ReviewForm({
                           } else {
                             setImagePreview(null);
                           }
-                          setIsTakingPhoto(false); // Reset camera state if a file is uploaded
+                          setIsTakingPhoto(false); 
                         }}
                         onBlur={imageField.onBlur}
                         name={imageField.name}
@@ -474,5 +513,3 @@ export default function ReviewForm({
     </Form>
   );
 }
-
-
