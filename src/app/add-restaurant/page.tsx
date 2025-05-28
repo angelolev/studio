@@ -791,18 +791,18 @@ export default function AddRestaurantPage() {
                     render={({ field: imageField }) => (
                       <FormItem>
                         <FormLabel>Imagen del Restaurante</FormLabel>
-                        <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex gap-2">
                           <Button
                             type="button"
                             onClick={openCamera}
-                            variant="outline"
+                            variant="default"
                             className="flex-1"
                           >
                             <Camera className="mr-2 h-4 w-4" /> Tomar Foto
                           </Button>
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="default"
                             className="flex-1"
                             onClick={() => fileUploadInputRef.current?.click()}
                           >

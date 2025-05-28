@@ -368,7 +368,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
                   </LeafletMarker>
                 </LeafletMapContainer>
                 <Button
-                  variant="outline"
+                  variant="default"
                   className="mt-3 w-full"
                   onClick={() => {
                     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurant.latitude},${restaurant.longitude}`;
