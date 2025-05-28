@@ -38,9 +38,6 @@ import type {
 } from "leaflet";
 import dynamic from "next/dynamic";
 
-// Removed direct image imports from 'leaflet/dist/images'
-
-
 const LeafletMapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   {
@@ -92,7 +89,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     staleTime: 5 * 60 * 1000,
-    enabled: true,
+    enabled: true, // Fetch reviews immediately for card display
     select: (data) =>
       data.map((review) => ({
         ...review,
@@ -118,11 +115,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         .then((leafletModule) => {
           if (!isMounted) return;
           
-          // Create icon instance with public paths
           const icon = new leafletModule.Icon({
-            iconUrl: '/images/marker-icon.png', // Assuming in public/images
-            iconRetinaUrl: '/images/marker-icon-2x.png', // Assuming in public/images
-            shadowUrl: '/images/marker-shadow.png', // Assuming in public/images
+            iconUrl: '/images/leaflet/marker-icon.png',
+            iconRetinaUrl: '/images/leaflet/marker-icon-2x.png',
+            shadowUrl: '/images/leaflet/marker-shadow.png',
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
@@ -130,7 +126,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           });
 
           setL(leafletModule);
-          setMarkerIconInstance(icon); // Store the instance
+          setMarkerIconInstance(icon); 
           setMapReadyDialog(true);
         })
         .catch(error => {
@@ -145,14 +141,12 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         (mapRefDialog.current as any).remove();
       }
       mapRefDialog.current = null;
-      setL(null);
-      setMarkerIconInstance(null);
+      // No need to set L and markerIconInstance to null here, as they are re-created on dialog open
       setMapReadyDialog(false);
     }
 
     return () => {
       isMounted = false;
-      // Additional cleanup if dialog is closed while map is still in a loading state or unmounted
       if (mapRefDialog.current && typeof (mapRefDialog.current as any).remove === 'function' && !isDialogOpen) {
          (mapRefDialog.current as any).remove();
          mapRefDialog.current = null;

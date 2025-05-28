@@ -17,8 +17,6 @@ import type {
 } from "leaflet";
 import dynamic from "next/dynamic";
 
-// Removed direct image imports from 'leaflet/dist/images'
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -38,7 +36,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Alert as UIAlert, // Renamed to avoid conflict with window.Alert
+  Alert as UIAlert,
   AlertDescription as UIAlertDescription,
   AlertTitle as UIAlertTitle,
 } from "@/components/ui/alert";
@@ -94,7 +92,7 @@ const DynamicLeafletPopup = dynamic(
 interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
-  icon: LeafletIconType | null;
+  icon: LeafletIconType | null; // Changed from ActualDefaultIcon to generic LeafletIconType
   MarkerComponent: typeof DynamicLeafletMarker | null;
   PopupComponent: typeof DynamicLeafletPopup | null;
   L: typeof import('leaflet') | null;
@@ -108,11 +106,11 @@ function LocationMarker({
   PopupComponent,
   L
 }: LocationMarkerProps) {
-  const { useMapEvents } = require("react-leaflet");
+  const { useMapEvents } = require("react-leaflet"); // Keep require inside if it works, or import globally if stable
 
   useMapEvents({
     click(e) {
-      if (L) { // Ensure L is available before using its methods
+      if (L) {
         onMapClick(L.latLng(e.latlng.lat, e.latlng.lng));
       }
     },
@@ -218,16 +216,15 @@ export default function AddRestaurantPage() {
   
   useEffect(() => {
     let isMounted = true;
-    if (!mapReady) {
+    if (!mapReady) { // Only run if map is not ready
       import('leaflet')
         .then((leafletModule) => {
           if (!isMounted) return;
 
-          // Create icon instance with public paths
           const icon = new leafletModule.Icon({
-            iconUrl: '/images/marker-icon.png', // Assuming in public/images
-            iconRetinaUrl: '/images/marker-icon-2x.png', // Assuming in public/images
-            shadowUrl: '/images/marker-shadow.png', // Assuming in public/images
+            iconUrl: '/images/leaflet/marker-icon.png',
+            iconRetinaUrl: '/images/leaflet/marker-icon-2x.png',
+            shadowUrl: '/images/leaflet/marker-shadow.png',
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
@@ -235,11 +232,11 @@ export default function AddRestaurantPage() {
           });
           
           setL(leafletModule);
-          setMapMarkerIcon(icon); // Store the instance
+          setMapMarkerIcon(icon);
           setMapReady(true); 
         })
         .catch(error => {
-          console.error("Failed to load Leaflet module or create icon", error);
+          console.error("Failed to load Leaflet module or create icon in AddRestaurantPage", error);
           if (isMounted) {
             toast({ title: "Error del Mapa", description: "No se pudo cargar la librería del mapa.", variant: "destructive" });
           }
@@ -248,9 +245,8 @@ export default function AddRestaurantPage() {
     return () => { 
       isMounted = false; 
       if (mapRef.current && typeof (mapRef.current as any).remove === 'function') {
-        (mapRef.current as any).remove(); // Leaflet's map instance remove method
+         // (mapRef.current as any).remove(); // Consider if mapRef cleanup is needed on page unmount
       }
-      mapRef.current = null;
     };
   }, [mapReady, toast]);
 
