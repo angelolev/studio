@@ -15,7 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription, // Added missing import
+  FormDescription,
 } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import StarRating from "./StarRating";
@@ -31,7 +31,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, UploadCloud, VideoOff } from "lucide-react";
 import { Input } from "@/components/ui/input"; // For hidden file input
 
-const MAX_FILE_SIZE_REVIEW = 2 * 1024 * 1024; // 2MB
+const MAX_FILE_SIZE_REVIEW = 5 * 1024 * 1024; // Changed to 5MB
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -49,7 +49,7 @@ const reviewSchema = z.object({
     .custom<File>()
     .refine(
       (file) => !file || file.size <= MAX_FILE_SIZE_REVIEW,
-      `El tamaño máximo del archivo es 2MB.`
+      `El tamaño máximo del archivo es 5MB.` // Changed message
     )
     .refine(
       (file) => !file || ACCEPTED_IMAGE_TYPES.includes(file?.type || ""),
@@ -428,7 +428,7 @@ export default function ReviewForm({
                     </FormControl>
                   </div>
                   <FormDescription>
-                    JPG, PNG, WebP, max 2MB.
+                    JPG, PNG, WebP, max 5MB.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
