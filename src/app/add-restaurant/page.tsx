@@ -17,6 +17,11 @@ import type {
 } from "leaflet";
 import dynamic from "next/dynamic";
 
+// Import marker images for explicit path usage
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -50,6 +55,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { Restaurant } from "@/types";
@@ -89,12 +95,13 @@ const DynamicLeafletPopup = dynamic(
   { ssr: false }
 );
 
+
 interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
-  icon: LeafletIconType | null; // Changed from ActualDefaultIcon to generic LeafletIconType
-  MarkerComponent: typeof DynamicLeafletMarker | null;
-  PopupComponent: typeof DynamicLeafletPopup | null;
+  icon: LeafletIconType | null;
+  MarkerComponent: typeof DynamicLeafletMarker | null; // Allow null for conditional rendering
+  PopupComponent: typeof DynamicLeafletPopup | null; // Allow null
   L: typeof import('leaflet') | null;
 }
 
@@ -106,11 +113,11 @@ function LocationMarker({
   PopupComponent,
   L
 }: LocationMarkerProps) {
-  const { useMapEvents } = require("react-leaflet"); // Keep require inside if it works, or import globally if stable
+  const { useMapEvents } = require("react-leaflet");
 
   useMapEvents({
     click(e) {
-      if (L) {
+      if (L) { // Ensure L is available
         onMapClick(L.latLng(e.latlng.lat, e.latlng.lng));
       }
     },
@@ -216,11 +223,11 @@ export default function AddRestaurantPage() {
   
   useEffect(() => {
     let isMounted = true;
-    if (!mapReady) { // Only run if map is not ready
+    if (!mapReady) {
       import('leaflet')
         .then((leafletModule) => {
           if (!isMounted) return;
-
+          // Explicitly configure default icon paths
           const icon = new leafletModule.Icon({
             iconUrl: '/images/leaflet/marker-icon.png',
             iconRetinaUrl: '/images/leaflet/marker-icon-2x.png',
@@ -232,7 +239,7 @@ export default function AddRestaurantPage() {
           });
           
           setL(leafletModule);
-          setMapMarkerIcon(icon);
+          setMapMarkerIcon(icon); // Use the created icon instance
           setMapReady(true); 
         })
         .catch(error => {
@@ -244,9 +251,6 @@ export default function AddRestaurantPage() {
     }
     return () => { 
       isMounted = false; 
-      if (mapRef.current && typeof (mapRef.current as any).remove === 'function') {
-         // (mapRef.current as any).remove(); // Consider if mapRef cleanup is needed on page unmount
-      }
     };
   }, [mapReady, toast]);
 
@@ -263,7 +267,7 @@ export default function AddRestaurantPage() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           if (!isMounted) return;
-          const userLatLng = L.latLng( 
+          const userLatLng = L.latLng( // Use L here
             position.coords.latitude,
             position.coords.longitude
           );
@@ -275,7 +279,7 @@ export default function AddRestaurantPage() {
         (error) => {
           if (!isMounted) return;
           console.warn(`Error obteniendo geolocalización: ${error.message}`);
-           if (mapRef.current) {
+           if (mapRef.current && L) { // Ensure L is available
             mapRef.current.flyTo(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
           }
         },
@@ -407,7 +411,7 @@ export default function AddRestaurantPage() {
       setImagePreview(null);
       setSelectedMapPosition(null);
       setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
-       if (mapRef.current) {
+       if (mapRef.current && L) { // Ensure L is available
         mapRef.current.setView(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
       }
       router.push("/");
@@ -566,7 +570,7 @@ export default function AddRestaurantPage() {
 
 
   return (
-    <div className="max-w-2xl mx-auto pb-28 relative">
+    <div className="max-w-2xl mx-auto pb-28 relative"> {/* pb-28 for fixed buttons */}
       <div className="mb-6">
         <Link href="/" passHref legacyBehavior>
           <Button variant="outline" size="sm">
@@ -860,11 +864,11 @@ export default function AddRestaurantPage() {
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 shadow-lg z-30
                       md:left-1/2 md:-translate-x-1/2 md:max-w-2xl md:rounded-t-lg">
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row sm:justify-center gap-3">
           <Button
             type="submit"
             form="add-restaurant-form" 
-            className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" 
+            className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90" 
             disabled={mutation.isPending || (isTakingPhoto && isCameraOpen)}
           >
             {mutation.isPending ? (
@@ -879,7 +883,7 @@ export default function AddRestaurantPage() {
           <Button
             variant="destructive" 
             onClick={() => router.push("/")}
-            className="flex-1" 
+            className="w-full sm:w-auto" 
           >
             Cerrar
           </Button>
