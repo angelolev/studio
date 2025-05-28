@@ -22,13 +22,13 @@ import { cuisines as allCuisinesStatic } from '@/data/cuisines';
 // --- Review Types and Functions ---
 export interface ReviewFirestoreData {
   userId: string;
-  userName: string | null;
-  userPhotoUrl?: string | null;
+  userName: string | null; // Already allows null, good.
+  userPhotoUrl?: string | null; // Already allows null or undefined, good.
   rating: number;
   text: string;
   timestamp: Timestamp | ReturnType<typeof serverTimestamp>;
   restaurantId: string;
-  imageUrl?: string; // Optional image URL
+  imageUrl?: string; 
 }
 
 export interface ReviewWithId extends ReviewFirestoreData {
@@ -57,15 +57,6 @@ export interface AddedReviewPlain {
 
 export async function addReviewToFirestore(
   restaurantId: string,
-  reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">,
-  // imageFile parameter is removed. imageUrl is now part of reviewData if provided.
-  // This function now expects imageUrl to be passed in reviewData if an image was uploaded by the client.
-  // However, to keep the type Omit clean, we'll add it to docData directly.
-  // So, the signature for the data coming from the client to the mutation will include imageUrl.
-  // The actual server action will receive it as part of the payload.
-  // Let's adjust reviewData type for the server action.
-  // We'll expect `imageUrl` to be part of the first-class properties of the data payload for the review.
-  // Let's redefine what addReviewToFirestore expects for reviewData from the client-side mutation.
   payload: Omit<ReviewFirestoreData, "timestamp" | "restaurantId"> & { imageUrl?: string }
 ): Promise<AddedReviewPlain> {
   if (!payload.userId) {
@@ -84,20 +75,26 @@ export async function addReviewToFirestore(
     throw new Error("Ya has enviado una opinión para este restaurante.");
   }
 
-  // Firebase Storage upload logic is removed from here.
-  // The imageUrl, if any, is expected to be in the payload.
-
-  const reviewsColRef = collection(db, "restaurants", restaurantId, "reviews");
   const docData: ReviewFirestoreData = {
     userId: payload.userId,
-    userName: payload.userName,
-    userPhotoUrl: payload.userPhotoUrl,
+    userName: payload.userName || null, // Ensure null if undefined/empty
+    userPhotoUrl: payload.userPhotoUrl || null, // Ensure null if undefined/empty
     rating: payload.rating,
     text: payload.text,
-    restaurantId, // Added back here
+    restaurantId,
     timestamp: serverTimestamp(),
     ...(payload.imageUrl && { imageUrl: payload.imageUrl }), 
   };
+
+  // Remove properties that are null to avoid writing them if not desired,
+  // or Firestore will store them as null. Keeping them as null is fine.
+  if (docData.userPhotoUrl === null) {
+    delete docData.userPhotoUrl;
+  }
+  if (docData.imageUrl === null) {
+    delete docData.imageUrl;
+  }
+
 
   const docRef = await addDoc(reviewsColRef, docData);
   const clientTimestampMillis = Date.now(); 
@@ -105,13 +102,13 @@ export async function addReviewToFirestore(
   return {
     id: docRef.id,
     userId: payload.userId,
-    userName: payload.userName,
-    userPhotoUrl: payload.userPhotoUrl,
+    userName: docData.userName, // Use the potentially nulled value
+    userPhotoUrl: docData.userPhotoUrl, // Use the potentially omitted or nulled value
     rating: payload.rating,
     text: payload.text,
     restaurantId,
     timestamp: clientTimestampMillis, 
-    ...(payload.imageUrl && { imageUrl: payload.imageUrl }),
+    imageUrl: docData.imageUrl, // Use the potentially omitted value
   };
 }
 
@@ -171,9 +168,10 @@ export async function addRestaurantToFirestore(
 
   if (imageFile) {
     const imageName = `${uuidv4()}-${imageFile.name}`;
-    const storageRef = ref(storage, `restaurant-images/${imageName}`);
+    const storageRefPath = `restaurant-images/${imageName}`;
+    const imageStorageRefInstance = ref(storage, storageRefPath);
     try {
-      const snapshot = await uploadBytes(storageRef, imageFile);
+      const snapshot = await uploadBytes(imageStorageRefInstance, imageFile);
       imageUrl = await getDownloadURL(snapshot.ref);
     } catch (error) {
       console.error("Error uploading image to Firebase Storage: ", error);
