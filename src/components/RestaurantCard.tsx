@@ -27,18 +27,22 @@ import {
   type ReviewWithNumericTimestamp,
 } from "@/lib/firestoreService";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, MapPin, Navigation } from "lucide-react";
+import { Loader2, MapPin, Navigation, Maximize } from "lucide-react"; // Added Maximize
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
 
-// Import the configuration function, not L directly
-import { configureLeafletDefaultIcon } from "@/lib/leaflet-config"; 
 import type {
   LatLngExpression,
   Map as LeafletMapType,
   Icon as LeafletIconType, 
 } from "leaflet";
 import dynamic from "next/dynamic";
+
+// Import marker images directly
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
 
 const LeafletMapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
@@ -76,6 +80,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const [L, setL] = useState<typeof import('leaflet') | null>(null);
+  const [markerIconInstance, setMarkerIconInstance] = useState<LeafletIconType | null>(null);
   const [mapReadyDialog, setMapReadyDialog] = useState(false); 
   const mapRefDialog = useRef<LeafletMapType | null>(null);
 
@@ -108,33 +113,47 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     staleTime: 5 * 60 * 1000,
   });
 
+
   useEffect(() => {
-    let isEffectMounted = true;
+    let isMounted = true;
     if (isDialogOpen && !mapReadyDialog) {
-      import('leaflet').then(leafletModule => {
-        if (isEffectMounted) {
-          configureLeafletDefaultIcon(leafletModule);
+      import('leaflet')
+        .then((leafletModule) => {
+          if (!isMounted) return;
+          
+          const icon = new leafletModule.Icon({
+            iconUrl: markerIcon.src,
+            iconRetinaUrl: markerIcon2x.src,
+            shadowUrl: markerShadow.src,
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41],
+          });
+
           setL(leafletModule);
+          setMarkerIconInstance(icon);
           setMapReadyDialog(true);
-        }
-      }).catch(error => {
-        console.error("Failed to load Leaflet module in dialog", error);
-        if (isEffectMounted) {
+        })
+        .catch(error => {
+          console.error("Failed to load Leaflet module in dialog", error);
+          if (isMounted) {
             toast({ title: "Error del Mapa", description: "No se pudo cargar el mapa del restaurante.", variant: "destructive" });
-        }
-      });
-    } else if (!isDialogOpen && mapRefDialog.current) {
-      if (typeof mapRefDialog.current.remove === 'function') {
+          }
+        });
+    } else if (!isDialogOpen && mapReadyDialog) {
+      if (mapRefDialog.current && typeof mapRefDialog.current.remove === 'function') {
         mapRefDialog.current.remove();
       }
       mapRefDialog.current = null;
-      // Reset mapReadyDialog if needed, though it should be set based on isDialogOpen
-      setMapReadyDialog(false); 
+      setL(null);
+      setMarkerIconInstance(null);
+      setMapReadyDialog(false);
     }
+
     return () => {
-      isEffectMounted = false;
-      // Additional cleanup for map instance if dialog closes abruptly
-      if (mapRefDialog.current && typeof mapRefDialog.current.remove === 'function') {
+      isMounted = false;
+      if (mapRefDialog.current && typeof mapRefDialog.current.remove === 'function' && !isDialogOpen) {
          mapRefDialog.current.remove();
          mapRefDialog.current = null;
       }
@@ -221,7 +240,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       ? [restaurant.latitude, restaurant.longitude]
       : undefined;
 
-  const canRenderMap = isDialogOpen && mapReadyDialog && restaurantLocation && L && 
+  const canRenderMap = isDialogOpen && mapReadyDialog && restaurantLocation && L && markerIconInstance && 
                        LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup;
 
   return (
@@ -324,8 +343,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                {/* Icon prop removed to use global default */}
-                <LeafletMarker position={restaurantLocation}>
+                <LeafletMarker position={restaurantLocation} icon={markerIconInstance}>
                   <LeafletPopup>{restaurant.name}</LeafletPopup>
                 </LeafletMarker>
               </LeafletMapContainer>
@@ -442,3 +460,6 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
+
+
+    
