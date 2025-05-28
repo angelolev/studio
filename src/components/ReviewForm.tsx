@@ -15,7 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
+  FormDescription as UIFormDescription, // Renamed to avoid conflict
 } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import StarRating from "./StarRating";
@@ -28,10 +28,10 @@ import {
 } from "@/lib/firestoreService";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Camera, UploadCloud, VideoOff } from "lucide-react";
+import { Loader2, Camera, UploadCloud, VideoOff, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input"; // For hidden file input
 
-const MAX_FILE_SIZE_REVIEW = 5 * 1024 * 1024; // Changed to 5MB
+const MAX_FILE_SIZE_REVIEW = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -49,7 +49,7 @@ const reviewSchema = z.object({
     .custom<File>()
     .refine(
       (file) => !file || file.size <= MAX_FILE_SIZE_REVIEW,
-      `El tamaño máximo del archivo es 5MB.` // Changed message
+      `El tamaño máximo del archivo es 5MB.`
     )
     .refine(
       (file) => !file || ACCEPTED_IMAGE_TYPES.includes(file?.type || ""),
@@ -84,8 +84,6 @@ export default function ReviewForm({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reviewFileUploadInputRef = useRef<HTMLInputElement | null>(null);
-  const reviewTextareaRef = useRef<HTMLTextAreaElement>(null);
-
 
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewSchema),
@@ -207,6 +205,14 @@ export default function ReviewForm({
     setIsTakingPhoto(false);
   };
 
+  const removeImage = () => {
+    setImagePreview(null);
+    form.setValue("image", undefined, { shouldValidate: true });
+    if (reviewFileUploadInputRef.current) {
+      reviewFileUploadInputRef.current.value = ""; // Clear the file input
+    }
+  };
+
   const addReviewMutation = useMutation({
     mutationFn: (data: {
       reviewData: Omit<ReviewFirestoreData, "timestamp" | "restaurantId" | "imageUrl">;
@@ -232,7 +238,7 @@ export default function ReviewForm({
 
       onReviewAdded(newAppReview);
       form.reset();
-      form.setValue("rating", 0); // Explicitly reset rating after form.reset
+      form.setValue("rating", 0); 
       setImagePreview(null);
       setIsTakingPhoto(false);
       setIsCameraOpen(false);
@@ -323,7 +329,6 @@ export default function ReviewForm({
               <FormLabel>Tu Opinión</FormLabel>
               <FormControl>
                 <Textarea
-                  ref={reviewTextareaRef}
                   placeholder="Cuéntanos sobre tu experiencia..."
                   {...field}
                   rows={4}
@@ -335,7 +340,6 @@ export default function ReviewForm({
           )}
         />
 
-        {/* Image Upload/Capture Section */}
         {isTakingPhoto && isCameraOpen ? (
           <div className="space-y-4">
             <div className="relative w-full aspect-video bg-muted rounded-md overflow-hidden border">
@@ -427,9 +431,9 @@ export default function ReviewForm({
                       />
                     </FormControl>
                   </div>
-                  <FormDescription>
+                  <UIFormDescription>
                     JPG, PNG, WebP, max 5MB.
-                  </FormDescription>
+                  </UIFormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -437,13 +441,23 @@ export default function ReviewForm({
             {imagePreview && (
               <div className="mt-4">
                 <FormLabel>Vista Previa</FormLabel>
-                <div className="mt-2 relative w-full aspect-video max-h-60 rounded-md overflow-hidden border">
+                <div className="relative w-full aspect-video max-h-60 rounded-md overflow-hidden border group">
                   <Image
                     src={imagePreview}
                     alt="Vista previa de imagen para la opinión"
                     fill
                     style={{ objectFit: "contain" }}
                   />
+                   <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-7 w-7 opacity-70 group-hover:opacity-100 transition-opacity"
+                    onClick={removeImage}
+                    aria-label="Eliminar imagen"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             )}
