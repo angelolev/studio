@@ -454,7 +454,7 @@ export default function ReviewForm({
           type="submit"
           className="w-full sm:w-auto"
           disabled={addReviewMutation.isPending || (isTakingPhoto && isCameraOpen)}
-          variant="outline"
+          variant="default"
         >
           {addReviewMutation.isPending ? (
             <>
