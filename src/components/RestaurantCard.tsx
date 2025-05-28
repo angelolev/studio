@@ -34,7 +34,7 @@ import { cuisines as allCuisines } from "@/data/cuisines";
 import type {
   LatLngExpression,
   Map as LeafletMapType,
-  Icon as LeafletIconType, 
+  Icon as LeafletIconType,
 } from "leaflet";
 import dynamic from "next/dynamic";
 
@@ -73,9 +73,10 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const [L, setL] = useState<typeof import('leaflet') | null>(null);
-  const [markerIconInstance, setMarkerIconInstance] = useState<LeafletIconType | null>(null);
-  const [mapReadyDialog, setMapReadyDialog] = useState(false); 
+  const [L, setL] = useState<typeof import("leaflet") | null>(null);
+  const [markerIconInstance, setMarkerIconInstance] =
+    useState<LeafletIconType | null>(null);
+  const [mapReadyDialog, setMapReadyDialog] = useState(false);
   const mapRefDialog = useRef<LeafletMapType | null>(null);
 
   const restaurantReviewsQueryKey = ["reviews", restaurant.id];
@@ -89,7 +90,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     queryKey: restaurantReviewsQueryKey,
     queryFn: () => getReviewsFromFirestore(restaurant.id),
     staleTime: 5 * 60 * 1000,
-    enabled: true, // Fetch reviews immediately for card display
+    enabled: true,
     select: (data) =>
       data.map((review) => ({
         ...review,
@@ -107,18 +108,17 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     staleTime: 5 * 60 * 1000,
   });
 
-
   useEffect(() => {
     let isMounted = true;
     if (isDialogOpen && !mapReadyDialog) {
-      import('leaflet')
+      import("leaflet")
         .then((leafletModule) => {
           if (!isMounted) return;
-          
+
           const icon = new leafletModule.Icon({
-            iconUrl: '/images/leaflet/marker-icon.png',
-            iconRetinaUrl: '/images/leaflet/marker-icon-2x.png',
-            shadowUrl: '/images/leaflet/marker-shadow.png',
+            iconUrl: "/images/leaflet/marker-icon.png",
+            iconRetinaUrl: "/images/leaflet/marker-icon-2x.png",
+            shadowUrl: "/images/leaflet/marker-shadow.png",
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
@@ -126,34 +126,45 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           });
 
           setL(leafletModule);
-          setMarkerIconInstance(icon); 
+          setMarkerIconInstance(icon);
           setMapReadyDialog(true);
         })
-        .catch(error => {
-          console.error("Failed to load Leaflet module or create icon in dialog", error);
+        .catch((error) => {
+          console.error(
+            "Failed to load Leaflet module or create icon in dialog",
+            error
+          );
           if (isMounted) {
-            toast({ title: "Error del Mapa", description: "No se pudo cargar el mapa del restaurante.", variant: "destructive" });
+            toast({
+              title: "Error del Mapa",
+              description: "No se pudo cargar el mapa del restaurante.",
+              variant: "destructive",
+            });
           }
         });
     } else if (!isDialogOpen && mapReadyDialog) {
-      // Cleanup map instance when dialog closes
-      if (mapRefDialog.current && typeof (mapRefDialog.current as any).remove === 'function') {
+      if (
+        mapRefDialog.current &&
+        typeof (mapRefDialog.current as any).remove === "function"
+      ) {
         (mapRefDialog.current as any).remove();
       }
       mapRefDialog.current = null;
-      // No need to set L and markerIconInstance to null here, as they are re-created on dialog open
-      setMapReadyDialog(false);
+      setMapReadyDialog(false); // Reset readiness when dialog closes
     }
 
     return () => {
       isMounted = false;
-      if (mapRefDialog.current && typeof (mapRefDialog.current as any).remove === 'function' && !isDialogOpen) {
-         (mapRefDialog.current as any).remove();
-         mapRefDialog.current = null;
+      if (
+        mapRefDialog.current &&
+        typeof (mapRefDialog.current as any).remove === "function" &&
+        !isDialogOpen // Ensure we only remove if it's not supposed to be open
+      ) {
+        (mapRefDialog.current as any).remove();
+        mapRefDialog.current = null;
       }
     };
   }, [isDialogOpen, mapReadyDialog, toast]);
-
 
   useEffect(() => {
     if (reviewsError) {
@@ -234,8 +245,16 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
       ? [restaurant.latitude, restaurant.longitude]
       : undefined;
 
-  const canRenderMap = isDialogOpen && mapReadyDialog && restaurantLocation && L && markerIconInstance && 
-                       LeafletMapContainer && LeafletTileLayer && LeafletMarker && LeafletPopup;
+  const canRenderMap =
+    isDialogOpen &&
+    mapReadyDialog &&
+    restaurantLocation &&
+    L &&
+    markerIconInstance &&
+    LeafletMapContainer &&
+    LeafletTileLayer &&
+    LeafletMarker &&
+    LeafletPopup;
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -295,8 +314,8 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         </div>
       </Card>
 
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="text-2xl">{restaurant.name}</DialogTitle>
           <DialogDescription className="text-base">
             {cuisineNames}
@@ -318,55 +337,60 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           </div>
         </DialogHeader>
 
-        {isDialogOpen && restaurantLocation ? (
+        <div className="overflow-y-auto flex-grow px-6 py-4 space-y-6">
+          {isDialogOpen && restaurantLocation ? (
             canRenderMap ? (
-            <div className="my-4">
-              <LeafletMapContainer
-                key={restaurant.id + (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")}
-                center={restaurantLocation}
-                zoom={17} 
-                scrollWheelZoom={false}
-                style={{
-                  height: "200px", 
-                  width: "100%",
-                  borderRadius: "var(--radius)",
-                }}
-                ref={mapRefDialog}
-              >
-                <LeafletTileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <LeafletMarker position={restaurantLocation} icon={markerIconInstance}>
-                  <LeafletPopup>{restaurant.name}</LeafletPopup>
-                </LeafletMarker>
-              </LeafletMapContainer>
-              <Button
-                variant="outline"
-                className="mt-3 w-full"
-                onClick={() => {
-                  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurant.latitude},${restaurant.longitude}`;
-                  window.open(mapsUrl, "_blank", "noopener,noreferrer");
-                }}
-              >
-                <Navigation className="mr-2 h-4 w-4" />
-                Obtener Direcciones
-              </Button>
-            </div>
-          ) : (
-            <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p className="ml-2">Cargando mapa...</p>
-            </div>
-          )
-        ) : isDialogOpen && !restaurantLocation ? (
-          <p className="my-4 text-sm text-muted-foreground italic">
-            La ubicación en el mapa no está disponible para este restaurante.
-          </p>
-        ) : null}
+              <div className="my-0"> {/* Adjusted margin */}
+                <LeafletMapContainer
+                  key={
+                    restaurant.id +
+                    (isDialogOpen ? "-dialog-map-open" : "-dialog-map-closed")
+                  }
+                  center={restaurantLocation}
+                  zoom={17}
+                  scrollWheelZoom={false}
+                  style={{
+                    height: "200px",
+                    width: "100%",
+                    borderRadius: "var(--radius)",
+                  }}
+                  ref={mapRefDialog}
+                >
+                  <LeafletTileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <LeafletMarker
+                    position={restaurantLocation}
+                    icon={markerIconInstance!} // Added non-null assertion as it's checked in canRenderMap
+                  >
+                    <LeafletPopup>{restaurant.name}</LeafletPopup>
+                  </LeafletMarker>
+                </LeafletMapContainer>
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={() => {
+                    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${restaurant.latitude},${restaurant.longitude}`;
+                    window.open(mapsUrl, "_blank", "noopener,noreferrer");
+                  }}
+                >
+                  <Navigation className="mr-2 h-4 w-4" />
+                  Obtener Direcciones
+                </Button>
+              </div>
+            ) : (
+              <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-md my-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="ml-2">Cargando mapa...</p>
+              </div>
+            )
+          ) : isDialogOpen && !restaurantLocation ? (
+            <p className="my-4 text-sm text-muted-foreground italic">
+              La ubicación en el mapa no está disponible para este restaurante.
+            </p>
+          ) : null}
 
-
-        <div className="overflow-y-auto flex-grow pr-2 space-y-6">
           <ReviewSummary
             restaurantName={restaurant.name}
             reviews={reviews.map((r) => r.text)}
@@ -441,13 +465,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               </p>
             )}
         </div>
-        <DialogFooter className="mt-auto pt-4 border-t">
+        <DialogFooter className="mt-auto p-6 pt-4 border-t">
           <DialogClose asChild>
-            <Button
-              variant="destructive"
-            >
-              Cerrar
-            </Button>
+            <Button variant="destructive">Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
