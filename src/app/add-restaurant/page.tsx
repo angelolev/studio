@@ -17,10 +17,7 @@ import type {
 } from "leaflet";
 import dynamic from "next/dynamic";
 
-// Import marker images directly
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+// Removed direct image imports from 'leaflet/dist/images'
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +38,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Alert,
+  Alert as UIAlert, // Renamed to avoid conflict with window.Alert
   AlertDescription as UIAlertDescription,
   AlertTitle as UIAlertTitle,
 } from "@/components/ui/alert";
@@ -97,9 +94,10 @@ const DynamicLeafletPopup = dynamic(
 interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
-  icon: LeafletIconType | null; // Expect a configured icon instance
-  MarkerComponent: typeof DynamicLeafletMarker | null; // For type safety
-  PopupComponent: typeof DynamicLeafletPopup | null;   // For type safety
+  icon: LeafletIconType | null;
+  MarkerComponent: typeof DynamicLeafletMarker | null;
+  PopupComponent: typeof DynamicLeafletPopup | null;
+  L: typeof import('leaflet') | null;
 }
 
 function LocationMarker({
@@ -107,17 +105,20 @@ function LocationMarker({
   onMapClick,
   icon,
   MarkerComponent,
-  PopupComponent
+  PopupComponent,
+  L
 }: LocationMarkerProps) {
   const { useMapEvents } = require("react-leaflet");
 
   useMapEvents({
     click(e) {
-      onMapClick(e.latlng);
+      if (L) { // Ensure L is available before using its methods
+        onMapClick(L.latLng(e.latlng.lat, e.latlng.lng));
+      }
     },
   });
 
-  if (!position || !icon || !MarkerComponent || !PopupComponent) {
+  if (!position || !icon || !MarkerComponent || !PopupComponent || !L) {
     return null;
   }
 
@@ -217,35 +218,45 @@ export default function AddRestaurantPage() {
   
   useEffect(() => {
     let isMounted = true;
-    if (typeof window !== 'undefined' && !mapReady) {
-      import('leaflet').then(leafletModule => {
-        if (!isMounted) return;
+    if (!mapReady) {
+      import('leaflet')
+        .then((leafletModule) => {
+          if (!isMounted) return;
 
-        const icon = new leafletModule.Icon({
-          iconUrl: markerIcon.src,
-          iconRetinaUrl: markerIcon2x.src,
-          shadowUrl: markerShadow.src,
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41],
+          // Create icon instance with public paths
+          const icon = new leafletModule.Icon({
+            iconUrl: '/images/marker-icon.png', // Assuming in public/images
+            iconRetinaUrl: '/images/marker-icon-2x.png', // Assuming in public/images
+            shadowUrl: '/images/marker-shadow.png', // Assuming in public/images
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41],
+          });
+          
+          setL(leafletModule);
+          setMapMarkerIcon(icon); // Store the instance
+          setMapReady(true); 
+        })
+        .catch(error => {
+          console.error("Failed to load Leaflet module or create icon", error);
+          if (isMounted) {
+            toast({ title: "Error del Mapa", description: "No se pudo cargar la librería del mapa.", variant: "destructive" });
+          }
         });
-        
-        setL(leafletModule);
-        setMapMarkerIcon(icon);
-        setMapReady(true); 
-      }).catch(error => {
-        console.error("Failed to load Leaflet module", error);
-        if (isMounted) {
-          toast({ title: "Error del Mapa", description: "No se pudo cargar la librería del mapa.", variant: "destructive" });
-        }
-      });
     }
-    return () => { isMounted = false; };
+    return () => { 
+      isMounted = false; 
+      if (mapRef.current && typeof (mapRef.current as any).remove === 'function') {
+        (mapRef.current as any).remove(); // Leaflet's map instance remove method
+      }
+      mapRef.current = null;
+    };
   }, [mapReady, toast]);
 
 
   useEffect(() => {
+    let isMounted = true;
     if (
       mapReady && 
       L && 
@@ -255,6 +266,7 @@ export default function AddRestaurantPage() {
     ) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (!isMounted) return;
           const userLatLng = L.latLng( 
             position.coords.latitude,
             position.coords.longitude
@@ -265,6 +277,7 @@ export default function AddRestaurantPage() {
           }
         },
         (error) => {
+          if (!isMounted) return;
           console.warn(`Error obteniendo geolocalización: ${error.message}`);
            if (mapRef.current) {
             mapRef.current.flyTo(DEFAULT_MAP_CENTER_LIMA, DEFAULT_MAP_ZOOM);
@@ -273,6 +286,7 @@ export default function AddRestaurantPage() {
         { timeout: 10000 }
       );
     }
+    return () => { isMounted = false; };
   }, [mapReady, L, form]);
 
 
@@ -686,6 +700,7 @@ export default function AddRestaurantPage() {
                           icon={mapMarkerIcon}
                           MarkerComponent={DynamicLeafletMarker}
                           PopupComponent={DynamicLeafletPopup}
+                          L={L}
                         />
                       </LeafletMapContainer>
                     ) : (
@@ -910,6 +925,3 @@ export default function AddRestaurantPage() {
     </div>
   );
 }
-
-
-    

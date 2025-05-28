@@ -27,7 +27,7 @@ import {
   type ReviewWithNumericTimestamp,
 } from "@/lib/firestoreService";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, MapPin, Navigation, Maximize } from "lucide-react"; // Added Maximize
+import { Loader2, MapPin, Navigation, Maximize } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cuisines as allCuisines } from "@/data/cuisines";
 
@@ -38,10 +38,7 @@ import type {
 } from "leaflet";
 import dynamic from "next/dynamic";
 
-// Import marker images directly
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+// Removed direct image imports from 'leaflet/dist/images'
 
 
 const LeafletMapContainer = dynamic(
@@ -121,10 +118,11 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
         .then((leafletModule) => {
           if (!isMounted) return;
           
+          // Create icon instance with public paths
           const icon = new leafletModule.Icon({
-            iconUrl: markerIcon.src,
-            iconRetinaUrl: markerIcon2x.src,
-            shadowUrl: markerShadow.src,
+            iconUrl: '/images/marker-icon.png', // Assuming in public/images
+            iconRetinaUrl: '/images/marker-icon-2x.png', // Assuming in public/images
+            shadowUrl: '/images/marker-shadow.png', // Assuming in public/images
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
@@ -132,18 +130,19 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           });
 
           setL(leafletModule);
-          setMarkerIconInstance(icon);
+          setMarkerIconInstance(icon); // Store the instance
           setMapReadyDialog(true);
         })
         .catch(error => {
-          console.error("Failed to load Leaflet module in dialog", error);
+          console.error("Failed to load Leaflet module or create icon in dialog", error);
           if (isMounted) {
             toast({ title: "Error del Mapa", description: "No se pudo cargar el mapa del restaurante.", variant: "destructive" });
           }
         });
     } else if (!isDialogOpen && mapReadyDialog) {
-      if (mapRefDialog.current && typeof mapRefDialog.current.remove === 'function') {
-        mapRefDialog.current.remove();
+      // Cleanup map instance when dialog closes
+      if (mapRefDialog.current && typeof (mapRefDialog.current as any).remove === 'function') {
+        (mapRefDialog.current as any).remove();
       }
       mapRefDialog.current = null;
       setL(null);
@@ -153,8 +152,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
 
     return () => {
       isMounted = false;
-      if (mapRefDialog.current && typeof mapRefDialog.current.remove === 'function' && !isDialogOpen) {
-         mapRefDialog.current.remove();
+      // Additional cleanup if dialog is closed while map is still in a loading state or unmounted
+      if (mapRefDialog.current && typeof (mapRefDialog.current as any).remove === 'function' && !isDialogOpen) {
+         (mapRefDialog.current as any).remove();
          mapRefDialog.current = null;
       }
     };
@@ -460,6 +460,3 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     </Dialog>
   );
 }
-
-
-    
