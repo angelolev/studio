@@ -22,8 +22,8 @@ import { cuisines as allCuisinesStatic } from '@/data/cuisines';
 // --- Review Types and Functions ---
 export interface ReviewFirestoreData {
   userId: string;
-  userName: string | null; // Already allows null, good.
-  userPhotoUrl?: string | null; // Already allows null or undefined, good.
+  userName: string | null;
+  userPhotoUrl?: string | null;
   rating: number;
   text: string;
   timestamp: Timestamp | ReturnType<typeof serverTimestamp>;
@@ -37,11 +37,17 @@ export interface ReviewWithId extends ReviewFirestoreData {
 }
 
 export interface ReviewWithNumericTimestamp
-  extends Omit<ReviewFirestoreData, "timestamp"> {
+  extends Omit<ReviewFirestoreData, "timestamp" | "restaurantId"> { // Added restaurantId omission as it's not directly part of review details for display
   id: string;
+  userId: string;
+  userName: string | null;
+  userPhotoUrl?: string | null;
+  rating: number;
+  text: string;
   timestamp: number;
   imageUrl?: string;
 }
+
 
 export interface AddedReviewPlain {
   id: string;
@@ -63,9 +69,10 @@ export async function addReviewToFirestore(
     throw new Error("Se requiere ID de usuario para agregar una opinión.");
   }
 
-  const reviewsColRefForCheck = collection(db, "restaurants", restaurantId, "reviews");
+  const reviewsCollectionRef = collection(db, "restaurants", restaurantId, "reviews");
+
   const duplicateCheckQuery = query(
-    reviewsColRefForCheck, 
+    reviewsCollectionRef, 
     where("userId", "==", payload.userId),
     limit(1) 
   );
@@ -77,38 +84,34 @@ export async function addReviewToFirestore(
 
   const docData: ReviewFirestoreData = {
     userId: payload.userId,
-    userName: payload.userName || null, // Ensure null if undefined/empty
-    userPhotoUrl: payload.userPhotoUrl || null, // Ensure null if undefined/empty
+    userName: payload.userName || null,
+    userPhotoUrl: payload.userPhotoUrl || null, 
     rating: payload.rating,
     text: payload.text,
-    restaurantId,
+    restaurantId, // This is needed to associate the review with the restaurant
     timestamp: serverTimestamp(),
     ...(payload.imageUrl && { imageUrl: payload.imageUrl }), 
   };
 
-  // Remove properties that are null to avoid writing them if not desired,
-  // or Firestore will store them as null. Keeping them as null is fine.
-  if (docData.userPhotoUrl === null) {
-    delete docData.userPhotoUrl;
-  }
-  if (docData.imageUrl === null) {
-    delete docData.imageUrl;
-  }
+  // Ensure undefined or empty strings for optional fields become null or are removed
+  if (!docData.userName) docData.userName = null; // Handles empty string
+  if (!docData.userPhotoUrl) delete docData.userPhotoUrl; // Remove if empty or null
+  if (!docData.imageUrl) delete docData.imageUrl; // Remove if empty or null
 
 
-  const docRef = await addDoc(reviewsColRef, docData);
+  const docRef = await addDoc(reviewsCollectionRef, docData); // Use the defined reviewsCollectionRef
   const clientTimestampMillis = Date.now(); 
 
   return {
     id: docRef.id,
     userId: payload.userId,
-    userName: docData.userName, // Use the potentially nulled value
-    userPhotoUrl: docData.userPhotoUrl, // Use the potentially omitted or nulled value
+    userName: docData.userName, 
+    userPhotoUrl: docData.userPhotoUrl, 
     rating: payload.rating,
     text: payload.text,
     restaurantId,
     timestamp: clientTimestampMillis, 
-    imageUrl: docData.imageUrl, // Use the potentially omitted value
+    imageUrl: docData.imageUrl, 
   };
 }
 
@@ -128,10 +131,10 @@ export async function getReviewsFromFirestore(
       userPhotoUrl: data.userPhotoUrl,
       rating: data.rating,
       text: data.text,
-      restaurantId: data.restaurantId,
+      // restaurantId: data.restaurantId, // Not needed in ReviewWithNumericTimestamp as per its definition
       imageUrl: data.imageUrl,
       timestamp: timestamp ? timestamp.toMillis() : Date.now(),
-    } as ReviewWithNumericTimestamp;
+    } as ReviewWithNumericTimestamp; // Cast needed due to omission of restaurantId
   });
 }
 
@@ -236,3 +239,5 @@ export async function checkRestaurantExistsByName(name: string): Promise<boolean
   const querySnapshot = await getDocs(q);
   return !querySnapshot.empty;
 }
+
+    
