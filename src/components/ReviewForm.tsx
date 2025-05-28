@@ -24,13 +24,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   addReviewToFirestore,
   type AddedReviewPlain,
-  type ReviewFirestoreData, // Keep this for the Omit type if needed
+  type ReviewFirestoreData,
 } from "@/lib/firestoreService";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, UploadCloud, VideoOff, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { storage } from "@/lib/firebase"; // Import Firebase storage instance
+import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 
@@ -68,7 +68,7 @@ interface ReviewFormProps {
   onReviewAdded: (newReview: AppReviewType) => void;
 }
 
-// Type for the data passed to the mutationFn
+// Type for the data passed to the mutationFn, aligning with addReviewToFirestore's payload
 type AddReviewMutationPayload = Omit<ReviewFirestoreData, "timestamp" | "restaurantId"> & { imageUrl?: string };
 
 
@@ -87,6 +87,8 @@ export default function ReviewForm({
     boolean | null
   >(null);
   const [currentStream, setCurrentStream] = useState<MediaStream | null>(null);
+  const [isUploadingClientSide, setIsUploadingClientSide] = useState(false);
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -245,6 +247,9 @@ export default function ReviewForm({
         variant: "destructive",
       });
     },
+    onSettled: () => {
+        setIsUploadingClientSide(false);
+    }
   });
 
   const onSubmit: SubmitHandler<ReviewFormData> = async (data) => {
@@ -257,7 +262,8 @@ export default function ReviewForm({
       return;
     }
 
-    addReviewMutation.setPending(); // Manually set pending state if needed for UI
+    setIsUploadingClientSide(true); 
+    // addReviewMutation.setPending(); // This line was causing the error and has been removed
 
     const { image, ...reviewCoreData } = data;
     const imageFile = image instanceof File ? image : undefined;
@@ -280,8 +286,7 @@ export default function ReviewForm({
           description: "No se pudo subir la imagen. La opinión se enviará sin ella.",
           variant: "destructive",
         });
-        // Optionally, allow submission without image or return early
-        // For now, we'll proceed to submit the review without the image if upload fails
+         // No need to set setIsUploadingClientSide(false) here, onSettled will handle it
       }
     }
 
@@ -294,6 +299,9 @@ export default function ReviewForm({
       ...(reviewImageUrl && { imageUrl: reviewImageUrl }),
     };
     
+    // If image upload failed but we want to proceed, or if no image, mutate directly.
+    // If image upload succeeded, also mutate.
+    // The isUploadingClientSide state will be reset by onSettled.
     addReviewMutation.mutate(reviewPayload);
   };
 
@@ -314,6 +322,8 @@ export default function ReviewForm({
       </p>
     );
   }
+
+  const isSubmitting = isUploadingClientSide || addReviewMutation.isPending;
 
   return (
     <Form {...form}>
@@ -389,7 +399,7 @@ export default function ReviewForm({
                 type="button"
                 onClick={capturePhoto}
                 className="w-full"
-                disabled={hasCameraPermission !== true || !currentStream}
+                disabled={hasCameraPermission !== true || !currentStream || isSubmitting}
                 variant="outline"
               >
                 <Camera className="mr-2 h-4 w-4" /> Capturar Foto
@@ -402,6 +412,7 @@ export default function ReviewForm({
                   setIsTakingPhoto(false);
                 }}
                 className="w-full"
+                disabled={isSubmitting}
               >
                 Cancelar
               </Button>
@@ -421,6 +432,7 @@ export default function ReviewForm({
                       onClick={openCamera}
                       variant="default"
                       className="flex-1"
+                      disabled={isSubmitting}
                     >
                       <Camera className="mr-2 h-4 w-4" /> Tomar Foto
                     </Button>
@@ -429,6 +441,7 @@ export default function ReviewForm({
                       variant="default"
                       className="flex-1"
                       onClick={() => reviewFileUploadInputRef.current?.click()}
+                      disabled={isSubmitting}
                     >
                       <UploadCloud className="mr-2 h-4 w-4" /> Subir Imagen
                     </Button>
@@ -458,6 +471,7 @@ export default function ReviewForm({
                         }}
                         onBlur={imageField.onBlur}
                         name={imageField.name}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                   </div>
@@ -485,6 +499,7 @@ export default function ReviewForm({
                     className="absolute top-1 right-1 h-7 w-7 opacity-70 group-hover:opacity-100 transition-opacity"
                     onClick={removeImage}
                     aria-label="Eliminar imagen"
+                    disabled={isSubmitting}
                   >
                     <XCircle className="h-4 w-4" />
                   </Button>
@@ -497,10 +512,10 @@ export default function ReviewForm({
         <Button
           type="submit"
           className="w-full sm:w-auto"
-          disabled={addReviewMutation.isPending || (isTakingPhoto && isCameraOpen)}
+          disabled={isSubmitting || (isTakingPhoto && isCameraOpen && !currentStream)}
           variant="default"
         >
-          {addReviewMutation.isPending ? (
+          {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Enviando...
