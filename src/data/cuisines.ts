@@ -5,6 +5,7 @@ export const cuisines: Cuisine[] = [
   { id: 'hamburgers', name: 'Hamburguesas' },
   { id: 'cafe', name: 'Café' },
   { id: 'chifa', name: 'Chifa' },
+  { id: 'criollo', name: 'Comida criolla' },
   { id: 'postres', name: 'Postres' },
   { id: 'fast_food', name: 'Comida rápida' },
   { id: 'makis', name: 'Makis' },
