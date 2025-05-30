@@ -100,20 +100,20 @@ interface LocationMarkerProps {
   position: LatLng | null;
   onMapClick: (latlng: LatLng) => void;
   icon: LeafletIconType | null;
-  MarkerComponent: typeof DynamicLeafletMarker | null;
-  PopupComponent: typeof DynamicLeafletPopup | null;
-  L: typeof import('leaflet') | null;
+  MarkerComponent: typeof DynamicLeafletMarker | null; // Prop for dynamically loaded Marker
+  PopupComponent: typeof DynamicLeafletPopup | null;   // Prop for dynamically loaded Popup
+  L: typeof import('leaflet') | null; // Prop for Leaflet library
 }
 
 function LocationMarker({
   position,
   onMapClick,
   icon,
-  MarkerComponent,
-  PopupComponent,
+  MarkerComponent, // Use the prop
+  PopupComponent,  // Use the prop
   L
 }: LocationMarkerProps) {
-  const { useMapEvents } = require("react-leaflet"); 
+  const { useMapEvents } = require("react-leaflet"); // Keep this require inside for client-side only
 
   useMapEvents({
     click(e) {
@@ -123,7 +123,7 @@ function LocationMarker({
     },
   });
 
-  if (!position || !icon || !MarkerComponent || !PopupComponent || !L) {
+  if (!position || !icon || !MarkerComponent || !PopupComponent || !L) { // Check for MarkerComponent and PopupComponent
     return null;
   }
 
@@ -144,7 +144,7 @@ const ACCEPTED_IMAGE_TYPES = [
 ];
 
 const DEFAULT_MAP_CENTER_LIMA: LatLngExpression = [-12.046374, -77.042793];
-const DEFAULT_MAP_ZOOM = 15;
+const DEFAULT_MAP_ZOOM = 16; // Increased from 15
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, {
@@ -221,7 +221,7 @@ export default function AddRestaurantPage() {
 
   useEffect(() => {
     let isMounted = true;
-    if (typeof window !== 'undefined' && !mapReady) { // Ensure this runs only client-side
+    if (!mapReady) { // Ensure this runs only once to load Leaflet and configure icon
       import('leaflet')
         .then((leafletModule) => {
           if (!isMounted) return;
@@ -239,11 +239,10 @@ export default function AddRestaurantPage() {
             });
             (leafletModule.Icon.Default.prototype as any)._iconInit = true;
           }
-
           const icon = new leafletModule.Icon.Default();
           setL(leafletModule);
           setMapMarkerIcon(icon);
-          setMapReady(true); // Indicate Leaflet and its icon are ready
+          setMapReady(true);
         })
         .catch(error => {
           console.error("Failed to load Leaflet module in AddRestaurantPage", error);
@@ -253,20 +252,18 @@ export default function AddRestaurantPage() {
         });
     }
     return () => { isMounted = false; };
-  }, [mapReady, toast]); // mapReady ensures this runs once after initial client mount attempt
+  }, [mapReady, toast]); 
 
 
   useEffect(() => {
     let isMounted = true;
-    // This effect sets the initial center of the map AFTER Leaflet is ready.
-    // It runs if mapReady & L are true, and currentMapCenter has not been determined yet.
-    if (mapReady && L && !currentMapCenter) {
+    if (mapReady && L && currentMapCenter === null) { // Only set initial center if not already set
       const formLat = form.getValues("latitude");
       const formLng = form.getValues("longitude");
 
       if (formLat !== undefined && formLng !== undefined) {
-        const preloadedPosition = L.latLng(formLat, formLng);
         if (isMounted) {
+          const preloadedPosition = L.latLng(formLat, formLng);
           setCurrentMapCenter(preloadedPosition);
           setSelectedMapPosition(preloadedPosition);
         }
@@ -276,7 +273,7 @@ export default function AddRestaurantPage() {
             if (isMounted) {
               const userLatLng = L.latLng(position.coords.latitude, position.coords.longitude);
               setCurrentMapCenter(userLatLng);
-              // No flyTo initially, let MapContainer use currentMapCenter for its 'center' prop
+              // Map will center via `center` prop, flyTo if mapRef is available later
             }
           },
           (error) => {
@@ -289,22 +286,22 @@ export default function AddRestaurantPage() {
         );
       } else {
         if (isMounted) {
-          setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA);
+          setCurrentMapCenter(DEFAULT_MAP_CENTER_LIMA); // Fallback if no geolocation
         }
       }
     }
     return () => { isMounted = false; };
-  }, [mapReady, L, form, currentMapCenter]); // form is included to re-evaluate if needed, currentMapCenter to run only once
+  }, [mapReady, L, form, currentMapCenter]); // currentMapCenter is in dependency array to react if it's reset to null
 
   // Effect to invalidate map size once it's rendered and centered
   useEffect(() => {
     if (mapRef.current && currentMapCenter) { // Ensure mapRef.current and currentMapCenter are set
       const timer = setTimeout(() => {
-        mapRef.current?.invalidateSize(); // Recalculate map size
-      }, 150); // A slight delay for DOM to settle
+        mapRef.current?.invalidateSize();
+      }, 150); 
       return () => clearTimeout(timer);
     }
-  }, [currentMapCenter]); // Run when currentMapCenter changes (which happens after initial load)
+  }, [currentMapCenter]); 
 
 
   useEffect(() => {
@@ -552,7 +549,7 @@ export default function AddRestaurantPage() {
       form.setValue("longitude", latlng.lng, {
         shouldValidate: true,
       });
-       if (mapRef.current) { // Gently pan to selected location, zoom remains
+       if (mapRef.current) { 
         mapRef.current.panTo(latlng); 
       }
     },
@@ -582,7 +579,6 @@ export default function AddRestaurantPage() {
     );
   }
 
-  // The center of the map will be currentMapCenter until a user clicks, then selectedMapPosition takes precedence for display
   const displayCenter = selectedMapPosition
     ? ([selectedMapPosition.lat, selectedMapPosition.lng] as LatLngExpression)
     : currentMapCenter;
@@ -698,9 +694,9 @@ export default function AddRestaurantPage() {
                       Haz clic en el mapa para seleccionar la ubicación del
                       restaurante.
                     </UIFormDescription>
-                     {canRenderMap && displayCenter ? ( // displayCenter ensures we have a center before rendering
+                     {canRenderMap && displayCenter ? ( 
                       <LeafletMapContainer
-                        center={displayCenter} // Use displayCenter which falls back to currentMapCenter
+                        center={displayCenter} 
                         zoom={DEFAULT_MAP_ZOOM}
                         style={{
                           height: "250px",
