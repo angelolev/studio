@@ -144,7 +144,7 @@ const ACCEPTED_IMAGE_TYPES = [
 ];
 
 const DEFAULT_MAP_CENTER_LIMA: LatLngExpression = [-12.046374, -77.042793];
-const DEFAULT_MAP_ZOOM = 16; // Increased from 15
+const DEFAULT_MAP_ZOOM = 17; // Increased from 15
 
 const addRestaurantSchema = z.object({
   name: z.string().min(2, {
