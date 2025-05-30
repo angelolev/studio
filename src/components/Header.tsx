@@ -75,7 +75,7 @@ export default function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button variant="outline" onClick={signInWithGoogle}>
+            <Button variant="default" onClick={signInWithGoogle}>
               <LogIn className="mr-2 h-4 w-4" />
               Ingresar
             </Button>
